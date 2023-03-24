@@ -29,7 +29,7 @@ def main():
     # Create a InitParameters object and set configuration parameters
     init_params = sl.InitParameters()
     init_params.camera_resolution = sl.RESOLUTION.HD720  
-    init_params.camera_fps = 60  
+    init_params.camera_fps = 30  
 
     # Open the camera
     zedOpened = zed.open(init_params)
@@ -38,9 +38,9 @@ def main():
 
     print("Camera opened")
 
-    path = "SS_Martha\YOLOv8\Validation"
-    file = "buoyvideo.svo"
-    filepath = path + file
+    path = "C:\GitHub\SS_Martha\YOLOv8\Validation"
+    file = "buoyvideo_1.svo"
+    filepath = "{}\{}".format(path, file)
 
     # "Bachelor/Maskinsyn/VideoCaptures/test/test.svo"
     recording_param = sl.RecordingParameters(filepath, sl.SVO_COMPRESSION_MODE.H264)

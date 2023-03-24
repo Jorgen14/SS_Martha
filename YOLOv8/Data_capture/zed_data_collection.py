@@ -1,9 +1,13 @@
 import cv2 as cv
 import numpy
 
-path = "SS_Martha\YOLOv8\Training\Images"
-file = "buoys"
-filepath = path + file
+#path = "SS_Martha\YOLOv8\Training\Images"
+#path = "SS_Martha/YOLOv8/Training/Images/"
+path = "C:\GitHub\SS_Martha\YOLOv8\Training\Images"
+file = "buoys_set_1_pic_"
+#filepath = path + file
+filepath = "{}\{}".format(path, file)
+print(filepath)
 
 i = 1
 startCapture = False
@@ -37,17 +41,17 @@ while cap.isOpened():
     if PRESS_TO_TAKE_PICS:
         if cv.waitKey(1) == ord('s'):
             cv.imwrite(filepath + "{}.png".format(str(i)), left_image)
-            print("Number of frames saved: ", i)
+            print("Saved to: ", filepath + "{}.png".format(str(i)))
             i += 1
     else:
         if cv.waitKey(1) == ord('s') or startCapture:
             cv.imwrite(filepath + "{}.png".format(str(i)), left_image)
-            print("Number of frames saved: ", i)
+            print("Saved to: ", filepath + "{}.png".format(str(i)))
             startCapture = True
             i += 1
 
     if cv.waitKey(1) == ord('q'):
-        print("Break")
+        print("Done!")
         break
 
 cap.release()

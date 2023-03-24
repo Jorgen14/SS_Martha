@@ -33,13 +33,13 @@ def progress_bar(percent_done, bar_length=50):
 
 def main():
     # Get input parameters
-    filepath = "SS_Martha\YOLOv8\Validation"
-    filename = "buoyvideo"
+    filepath = "C:\GitHub\SS_Martha\YOLOv8\Validation"
+    filename = "buoyvideo_1"
     inputFileName = "{}.svo".format(filename)
     newVideoFile = "{}.avi".format(filename)
 
-    svo_input_path = "{0}{1}".format(filepath, inputFileName)
-    output_path = "{0}{1}".format(filepath, newVideoFile)
+    svo_input_path = "{0}\{1}".format(filepath, inputFileName)
+    output_path = "{0}\{1}".format(filepath, newVideoFile)
     output_as_video = True    
 
     # Specify SVO path parameter
