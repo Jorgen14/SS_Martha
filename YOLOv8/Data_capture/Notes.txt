@@ -1,0 +1,11 @@
+zed_data_collection.py
+Data collection for training set.
+Outputs png files.
+
+zed_capture_svo.py
+Makes svo video.
+For testing YOLO model.
+
+zed_export.py
+Exports svo video to an avi videofile.
+For testing YOLO model.

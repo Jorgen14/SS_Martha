@@ -1,0 +1,6 @@
+Training: C:\GitHub\SS_Martha\YOLOv8\Training\Images
+Validation: C:\GitHub\SS_Martha\YOLOv8\Validation
+
+nc: 3
+
+names: ["red_buoy", "yellow_buoy", "green_buoy"]
