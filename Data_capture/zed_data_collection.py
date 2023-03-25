@@ -1,22 +1,24 @@
 import cv2 as cv
 import numpy
 
-TAKE_PICS = False
-i = 1
+TAKE_PICS = True
 startCapture = False
+i = 1
 
 path = "C:\GitHub\SS_Martha\YOLOv8\Training\Images" if TAKE_PICS else "C:\GitHub\SS_Martha\YOLOv8\Validation"
-file = "buoys_set_1_pic_" if TAKE_PICS else "buoys_set_1_vid"
+file = "buoys_set_2_pic_" if TAKE_PICS else "buoys_set_1_vid"
 filepath = "{}\{}".format(path, file)
 
 # Open ZED camera
-cap = cv.VideoCapture(0)
+cap = cv.VideoCapture(1)
 
 # Set the video resolution to HD720 (2560*720)
 # Options are: 4416*1242, 3840*1080, 2560*720, 1344*376
 # FPS will then be 15,    30/15,     60/30/15, 100/60/30/15 respectively
 cap.set(cv.CAP_PROP_FRAME_WIDTH, 2560)
 cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
+exposure = cap.get(cv.CAP_PROP_EXPOSURE) * 1
+cap.set(cv.CAP_PROP_EXPOSURE, exposure)
 
 if TAKE_PICS:
     print("Press 's' to take a picture manually, 'q' to quit")
