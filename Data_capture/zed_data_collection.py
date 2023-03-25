@@ -1,14 +1,13 @@
 import cv2 as cv
 import numpy
 
-path = "C:\GitHub\SS_Martha\YOLOv8\Training\Images"
-file = "buoys_set_1_pic_"
-filepath = "{}\{}".format(path, file)
-
+TAKE_PICS = False
 i = 1
 startCapture = False
 
-PRESS_TO_TAKE_PICS = True
+path = "C:\GitHub\SS_Martha\YOLOv8\Training\Images" if TAKE_PICS else "C:\GitHub\SS_Martha\YOLOv8\Validation"
+file = "buoys_set_1_pic_" if TAKE_PICS else "buoys_set_1_vid"
+filepath = "{}\{}".format(path, file)
 
 # Open ZED camera
 cap = cv.VideoCapture(0)
@@ -19,10 +18,12 @@ cap = cv.VideoCapture(0)
 cap.set(cv.CAP_PROP_FRAME_WIDTH, 2560)
 cap.set(cv.CAP_PROP_FRAME_HEIGHT, 720)
 
-if PRESS_TO_TAKE_PICS:
+if TAKE_PICS:
     print("Press 's' to take a picture manually, 'q' to quit")
 else:
-    print("Press 's' to start automatically take pictures, 'q' to quit")
+    fourcc = cv.VideoWriter_fourcc(*'mp4v')
+    out = cv.VideoWriter("{}.mp4".format(filepath), fourcc, 30.0, (1280, 720))
+    print("Press 's' to start taking a video, 'q' to quit")
 
 while cap.isOpened():
     # Get a new frame from camera
@@ -34,17 +35,16 @@ while cap.isOpened():
     # Display images
     cv.imshow("left", left_image)
 
-    if PRESS_TO_TAKE_PICS:
+    if TAKE_PICS:
         if cv.waitKey(1) == ord('s'):
             cv.imwrite(filepath + "{}.png".format(str(i)), left_image)
             print("Saved to: ", filepath + "{}.png".format(str(i)))
             i += 1
     else:
         if cv.waitKey(1) == ord('s') or startCapture:
-            cv.imwrite(filepath + "{}.png".format(str(i)), left_image)
-            print("Saved to: ", filepath + "{}.png".format(str(i)))
+            out.write(left_image)
             startCapture = True
-            i += 1
+            print("Writing to: ", filepath + ".mp4")
 
     if cv.waitKey(1) == ord('q'):
         print("Done!")
