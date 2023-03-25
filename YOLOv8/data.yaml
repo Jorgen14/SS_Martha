@@ -1,4 +1,4 @@
-Training: C:\GitHub\SS_Martha\YOLOv8\Training\Images
+Training: C:\GitHub\SS_Martha\YOLOv8\Training
 Validation: C:\GitHub\SS_Martha\YOLOv8\Validation
 
 nc: 3
