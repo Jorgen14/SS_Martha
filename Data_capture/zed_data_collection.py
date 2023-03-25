@@ -1,13 +1,9 @@
 import cv2 as cv
 import numpy
 
-#path = "SS_Martha\YOLOv8\Training\Images"
-#path = "SS_Martha/YOLOv8/Training/Images/"
 path = "C:\GitHub\SS_Martha\YOLOv8\Training\Images"
 file = "buoys_set_1_pic_"
-#filepath = path + file
 filepath = "{}\{}".format(path, file)
-print(filepath)
 
 i = 1
 startCapture = False

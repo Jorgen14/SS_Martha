@@ -36,10 +36,18 @@ def main():
     filepath = "C:\GitHub\SS_Martha\YOLOv8\Validation"
     filename = "buoyvideo_1"
     inputFileName = "{}.svo".format(filename)
-    newVideoFile = "{}.avi".format(filename)
+
+    outputLeft = "{}_left".format(filename)
+    outputRight = "{}_right".format(filename)
+    outputDepth = "{}_depth".format(filename)
+    newVideoFileLeft = "{}.avi".format(outputLeft)
+    newVideoFileRight = "{}.avi".format(outputRight)
+    newVideoFileDepth = "{}.avi".format(outputDepth)
 
     svo_input_path = "{0}\{1}".format(filepath, inputFileName)
-    output_path = "{0}\{1}".format(filepath, newVideoFile)
+    output_path_left = "{0}\{1}".format(filepath, newVideoFileLeft)
+    output_path_right = "{0}\{1}".format(filepath, newVideoFileRight)
+    output_path_depth = "{0}\{1}".format(filepath, newVideoFileDepth)
     output_as_video = True    
 
     # Specify SVO path parameter
@@ -65,18 +73,34 @@ def main():
 
     # Prepare single image containers
     left_image = sl.Mat()
+    right_image = sl.Mat()
+    depth_image = sl.Mat()
 
     svo_image_left_rgba = np.zeros((height, width, 4), dtype=np.uint8)
+    svo_image_right_rgba = np.zeros((height, width, 4), dtype=np.uint8)
+    svo_image_depth_rgba = np.zeros((height, width, 4), dtype=np.uint8)
 
-    video_writer = None
+    video_writer_left = None
+    video_writer_right = None
+    video_writer_depth = None
     if output_as_video:
         # Create video writer with MPEG-4 part 2 codec
-        video_writer = cv.VideoWriter(str(output_path),
+        video_writer_left = cv.VideoWriter(str(output_path_left),
+                                       cv.VideoWriter_fourcc('M', '4', 'S', '2'),
+                                       max(zed.get_camera_information().camera_fps, 25),
+                                       (width, height))
+        
+        video_writer_right = cv.VideoWriter(str(output_path_right),
+                                       cv.VideoWriter_fourcc('M', '4', 'S', '2'),
+                                       max(zed.get_camera_information().camera_fps, 25),
+                                       (width, height))
+        
+        video_writer_depth = cv.VideoWriter(str(output_path_depth),
                                        cv.VideoWriter_fourcc('M', '4', 'S', '2'),
                                        max(zed.get_camera_information().camera_fps, 25),
                                        (width, height))
 
-        if not video_writer.isOpened():
+        if not video_writer_left.isOpened() or not video_writer_right.isOpened() or not video_writer_depth.isOpened():
             sys.stdout.write("OpenCV video writer cannot be opened. Please check the .avi file path and write "
                              "permissions.\n")
             zed.close()
@@ -96,14 +120,27 @@ def main():
 
             # Retrieve SVO images
             zed.retrieve_image(left_image, sl.VIEW.LEFT)
+            zed.retrieve_image(right_image, sl.VIEW.RIGHT)
+            zed.retrieve_image(depth_image, sl.VIEW.DEPTH)
+            #zed.retrieve_measure(depth_image, sl.MEASURE.DEPTH)
 
             if output_as_video:
                 svo_image_left_rgba[0:height, 0:width, :] = left_image.get_data()
                 # Convert SVO image from RGBA to RGB
                 ocv_image_left_rgb = cv.cvtColor(svo_image_left_rgba, cv.COLOR_RGBA2RGB)
 
+                svo_image_right_rgba[0:height, 0:width, :] = right_image.get_data()
+                # Convert SVO image from RGBA to RGB
+                ocv_image_right_rgb = cv.cvtColor(svo_image_right_rgba, cv.COLOR_RGBA2RGB)
+
+                svo_image_depth_rgba[0:height, 0:width, :] = depth_image.get_data()
+                # Convert SVO image from RGBA to RGB
+                ocv_image_depth_rgb = cv.cvtColor(svo_image_depth_rgba, cv.COLOR_RGBA2RGB)
+
                 # Write the RGB image in the video
-                video_writer.write(ocv_image_left_rgb)
+                video_writer_left.write(ocv_image_left_rgb)
+                video_writer_right.write(ocv_image_right_rgb)
+                video_writer_depth.write(ocv_image_depth_rgb)
             else:
                 print("Nokka e riv ruskanes galt!")
 
@@ -117,7 +154,7 @@ def main():
 
     if output_as_video:
         # Close the video writer
-        video_writer.release()
+        video_writer_left.release()
 
     print("Resolution: {0}, {1}.".format(round(zed.get_camera_information().camera_resolution.width, 2), zed.get_camera_information().camera_resolution.height))
     print("Camera FPS: {0}".format(zed.get_camera_information().camera_fps))
