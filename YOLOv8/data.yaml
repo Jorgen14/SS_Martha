@@ -1,5 +1,5 @@
-Training: C:\GitHub\SS_Martha\YOLOv8\Training
-Validation: C:\GitHub\SS_Martha\YOLOv8\Validation
+train: C:\GitHub\SS_Martha\YOLOv8\Training
+val: C:\GitHub\SS_Martha\YOLOv8\Validation
 
 nc: 3
 
