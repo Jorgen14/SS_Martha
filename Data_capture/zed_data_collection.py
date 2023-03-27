@@ -6,7 +6,7 @@ startCapture = False
 i = 1
 
 path = "C:\GitHub\SS_Martha\YOLOv8\Training\Images" if TAKE_PICS else "C:\GitHub\SS_Martha\YOLOv8\Test"
-file = "buoys_set_2_pic_" if TAKE_PICS else "buoys_set_2_vid"
+file = "buoys_set_3_pic_" if TAKE_PICS else "buoys_set_3_vid"
 filepath = "{}\{}".format(path, file)
 
 # Open ZED camera
