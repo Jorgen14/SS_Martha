@@ -1,4 +1,5 @@
 #import rospy
+import numpy as np
 import pyzed.sl as sl
 from ultralytics import YOLO
 
@@ -34,24 +35,47 @@ class droneVision:
         positional_tracking_parameters = sl.PositionalTrackingParameters()
         self.zed.enable_positional_tracking(positional_tracking_parameters)
 
+        self.width = self.zed.get_camera_information().camera_configuration.resolution.width
+        self.height = self.zed.get_camera_information().camera_configuration.resolution.height
+        self.hfov = self.zed.get_camera_information().camera_configuration.calibration_parameters.left_cam.h_fov
+        self.cx = self.zed.get_camera_information().camera_configuration.calibration_parameters.left_cam.cx
+        self.baseline = self.zed.get_camera_information().get_camera_baseline
+
         self.img_left = sl.Mat()
         self.img_depth = sl.Mat()
 
         self.model = YOLO('YOLOv8/buoy_detect.pt') 
 
-    def get_image(self): # Return anything?
+    def get_image_and_depth_map(self): # Return anything?
         if self.zed.grab(self.runtime_params) == sl.ERROR_CODE.SUCCESS:
             self.zed.retrieve_image(self.img_left, sl.VIEW.LEFT)
             self.np_img_left = self.img_left.get_data()
-            self.zed.retrieve_measure(self.img_depth, sl.MEASURE.DEPTH) # May need to change resolution
+            self.depth_map = self.zed.retrieve_measure(self.img_depth, sl.MEASURE.DEPTH) # May need to change resolution
+            return self.np_img_left, self.depth_map
         else:
             print("Error grabbing image")
             exit(1)
 
-    def detections(self, image_):
-        self.detections = self.model.predict(source=image_)
+    def buoy_detector(self, image):
+        self.detections = self.model.predict(source=image)
         return self.detections
 
     def get_det_depth(self, x_detection, y_detection):
-        return self.img_depth.get_value(x_detection, y_detection)
+        return self.depth_map.get_value(x_detection, y_detection)
+    
+    def get_det_bearing(self, x_detection):
+        lamda_x = self.vfov / self.width
+        Tx = x_detection - self.cx
+        #Tx = x_detection - (self.cx + self.baseline/2) # set Tx from center of stereo pair
+        return Tx * lamda_x
+
+    def det_GPS_loc(self, distance, det_bearing, Martha_lat, Martha_lon, R=6371e3):
+        lat_rad = np.radians(Martha_lat)
+        lon_rad = np.radians(Martha_lon)
+        bearing_rad = np.radians(det_bearing)
+
+        det_lat = np.arcsin(np.sin(lat_rad) * np.cos(distance/R) + np.cos(lat_rad) * np.sin(distance/R) * np.cos(bearing_rad))
+        det_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(distance/R) * np.cos(lat_rad), np.cos(distance/R) - np.sin(lat_rad) * np.sin(det_lat))
+
+        return round(np.degrees(det_lat), 5), round(np.degrees(det_lon), 5)
     
