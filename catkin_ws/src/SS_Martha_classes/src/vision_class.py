@@ -56,7 +56,7 @@ class droneVision:
             print("Error grabbing image")
             exit(1)
 
-    def buoy_detector(self, image):
+    def get_detections(self, image):
         self.detections = self.model.predict(source=image)
         return self.detections
 
@@ -79,3 +79,7 @@ class droneVision:
 
         return round(np.degrees(det_lat), 5), round(np.degrees(det_lon), 5)
     
+    def set_waypoint(self, det_1_lat, det_1_lon, det_2_lat, det_2_lon):
+        wp_lat = (det_1_lat + det_2_lat) / 2
+        wp_lon = (det_1_lon + det_2_lon) / 2
+        return wp_lat, wp_lon
