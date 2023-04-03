@@ -1,7 +1,8 @@
-#import rospy
+import rospy
 import numpy as np
 import pyzed.sl as sl
 from ultralytics import YOLO
+from sensor_msgs.msg import LaserScan
 
 class droneVision:
     def __init__(self):
@@ -83,3 +84,14 @@ class droneVision:
         wp_lat = (det_1_lat + det_2_lat) / 2
         wp_lon = (det_1_lon + det_2_lon) / 2
         return wp_lat, wp_lon
+    
+class droneLidar:
+    def __init__(self):
+        self.sub_laser = rospy.Subscriber('/scan', LaserScan, self.laser_callback)
+
+    def laser_callback(self, data):
+        self.ranges = data.ranges
+        self.ang_inc = data.angle_increment
+
+    def get_ranges(self):
+        
