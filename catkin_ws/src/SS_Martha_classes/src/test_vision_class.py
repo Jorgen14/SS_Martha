@@ -1,4 +1,4 @@
-from vision_class import droneVision
+from martha_classes import droneLidar
 
 MarthaVision = droneVision()
 
@@ -14,3 +14,5 @@ print(detections)
 # buoy_1_lat, buoy_1_lon = MarthaVision.det_GPS_loc(buoy_distance, buoy_bearing, Martha_lat, Martha_lon)
 # buoy_2_lat, buoy_2_lon = MarthaVision.det_GPS_loc(buoy_2_distance, buoy_2_bearing, Martha_lat, Martha_lon)
 # wp = MarthaVision.set_waypoint(buoy_1_lat, buoy_1_lon, buoy_2_lat, buoy_2_lon)
+
+MarthaLidar = droneLidar()

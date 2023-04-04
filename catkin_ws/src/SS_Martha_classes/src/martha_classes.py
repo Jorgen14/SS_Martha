@@ -65,7 +65,7 @@ class droneVision:
         return self.depth_map.get_value(x_detection, y_detection)
     
     def get_det_bearing(self, x_detection):
-        lamda_x = self.vfov / self.width
+        lamda_x = self.hfov / self.width
         Tx = x_detection - self.cx
         #Tx = x_detection - (self.cx + self.baseline/2) # set Tx from center of stereo pair
         return Tx * lamda_x
@@ -85,13 +85,68 @@ class droneVision:
         wp_lon = (det_1_lon + det_2_lon) / 2
         return wp_lat, wp_lon
     
+
+    
 class droneLidar:
     def __init__(self):
         self.sub_laser = rospy.Subscriber('/scan', LaserScan, self.laser_callback)
+        self.prev_tracking_indexes = []
+        self.collision_course_duration = 0
+        self.slow_down_counter = 10
+        self.emg_stop_counter = 20
 
     def laser_callback(self, data):
         self.ranges = data.ranges
         self.ang_inc = data.angle_increment
 
-    def get_ranges(self):
-        
+    def close_obj_indexes(self):
+        prev_index = None
+        j = 0
+        self.obj_indexes = []
+        for i in range(len(self.ranges)):
+            if self.ranges[i] < 20:
+                if prev_index is None:
+                    self.obj_indexes.append([i])
+                    prev_index = i
+                else:
+                    if i - prev_index <= 1 and self.ranges[i] - self.ranges[prev_index] <= 0.5:
+                        self.obj_indexes[j].append(i)
+                    else:
+                        j += 1
+                        self.obj_indexes.append([i])
+                    prev_index = i
+
+    def tracking_indexes(self):
+        self.tracking_indx = []
+        for i in range(len(self.obj_indexes)):
+            self.tracking_indx(self.obj_indexes[i][int(len(self.obj_indexes[i])/2)])
+
+    def collision_course(self):
+        collision_list = []
+        if self.prev_tracking_indexes == []:
+            self.prev_tracking_indexes = self.tracking_indx
+        else:
+            try:
+                i = 0
+                while self.tracking_indx[i] or self.prev_tracking_indexes[i]:
+                    if abs(self.tracking_indx[i] - self.prev_tracking_indexes[i]) <= 5:
+                        collision_list.append(1)
+                    else:
+                        collision_list.append(0)
+                    i += 1
+            except IndexError:
+                pass
+
+        if 1 in collision_list:
+            self.collision_course_duration += 1
+        else:
+            self.collision_course_duration = 0
+
+    def avoid_collision(self):
+        if self.collision_course_duration >= self.emg_stop_counter:
+            self.emg_stop = True
+        elif self.collision_course_duration >= self.slow_down_counter:
+            self.slow_down = True
+        else:
+            self.emg_stop = False
+            self.slow_down = False
