@@ -70,10 +70,10 @@ class droneVision:
         #Tx = x_detection - (self.cx + self.baseline/2) # set Tx from center of stereo pair
         return Tx * lamda_x
 
-    def det_GPS_loc(self, distance, det_bearing, Martha_lat, Martha_lon, R=6371e3):
+    def det_GPS_loc(self, distance, det_bearing, Martha_lat, Martha_lon, Martha_heading, R=6371e3):
         lat_rad = np.radians(Martha_lat)
         lon_rad = np.radians(Martha_lon)
-        bearing_rad = np.radians(det_bearing)
+        bearing_rad = np.radians(Martha_heading + det_bearing)
 
         det_lat = np.arcsin(np.sin(lat_rad) * np.cos(distance/R) + np.cos(lat_rad) * np.sin(distance/R) * np.cos(bearing_rad))
         det_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(distance/R) * np.cos(lat_rad), np.cos(distance/R) - np.sin(lat_rad) * np.sin(det_lat))
