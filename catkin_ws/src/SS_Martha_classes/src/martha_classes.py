@@ -2,7 +2,10 @@
 import numpy as np
 import pyzed.sl as sl
 from ultralytics import YOLO
+import sys
 #from sensor_msgs.msg import LaserScan
+
+sys.path.insert(0, 'home/navo/GitHub/YOLOv8')
 
 class droneVision:
     def __init__(self):
