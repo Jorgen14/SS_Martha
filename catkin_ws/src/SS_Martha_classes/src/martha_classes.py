@@ -68,7 +68,7 @@ class droneVision:
             exit(1)
 
     def get_detections(self, image):
-        self.detections = self.model.predict(source=image, show=self.DEBUG)
+        self.detections = self.model.predict(source=image, conf=0.5, show=self.DEBUG)
         return self.detections
     
     def get_det_center(self, results):
