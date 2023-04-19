@@ -11,10 +11,14 @@ while True:
     # lat 
     # lon
     # heading
-    img_left, depth_map = MarthaVision.get_image_and_depth_map()
+    # img_left, depth_map = MarthaVision.get_image_and_depth_map()
 
-    detections = MarthaVision.get_detections(img_left)
-    detection_center = MarthaVision.get_det_center(detections)
+    # detections = MarthaVision.get_detections(img_left)
+
+    buoys, buoy_depth = MarthaVision.get_det_results()
+    print("Buoys: ", buoys)
+    print("Buoy depth: ", buoy_depth)
+
     #detection_depth = MarthaVision.get_det_depth(detection_center)
     #gps_loc = MarthaVision.det_GPS_loc(detection_center, lat, lon, heading)
 
