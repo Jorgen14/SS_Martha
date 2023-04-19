@@ -52,12 +52,15 @@ class droneVision:
 
     def get_image_and_depth_map(self): # Return anything?
         if self.zed.grab(self.runtime_params) == sl.ERROR_CODE.SUCCESS:
+
             self.zed.retrieve_image(self.img_left, sl.VIEW.LEFT)
             np_img_left_4ch = self.img_left.get_data()
-            np_img_left = np_img_left_4ch[:,:,:3] # Remove alpha channel
+            self.np_img_left = np_img_left_4ch[:,:,:3] # Remove alpha channel
+
             self.zed.retrieve_measure(self.img_depth, sl.MEASURE.DEPTH) # May need to change resolution
-            depth_map = self.img_depth.get_data()
-            return np_img_left, depth_map
+            self.depth_map = self.img_depth.get_data()
+
+            return self.np_img_left, self.depth_map
         else:
             print("Error grabbing image")
             exit(1)
@@ -66,18 +69,63 @@ class droneVision:
         return self.model.predict(source=image, conf=0.5, show=self.DEBUG) 
     
     def get_det_results(self):
-        img_left, depth_map = self.get_image_and_depth_map()
-        results = self.get_detections(img_left)
-        self.det_name = []
-        self.det_depth = []
+        self.get_image_and_depth_map()
+        results = self.get_detections(self.np_img_left)
+
+        self.buoy_color = []
+        self.buoy_depth = []
+        self.buoy_bearing = []
+
         for result in results:
             for box in result.boxes.xyxy:
                 center = ((box[2].item() - box[0].item()) / 2 + box[0].item(), 
                           (box[3].item() - box[1].item()) / 2 + box[1].item())
-                self.det_depth.append(depth_map[int(center[1])][int(center[0])])
+                self.buoy_depth.append(self.depth_map[int(center[1])][int(center[0])])
+                Tx = int(center[0]) - self.cx
+                theta = Tx * self.lamda_x
+                self.buoy_bearing.append(theta)
             for d_cls in result.boxes.cls:
-                self.det_name.append(self.model.names[int(d_cls)])
-        return self.det_name, self.det_depth
+                self.buoy_color.append(self.model.names[int(d_cls)])
+
+        return self.buoy_color, self.buoy_depth, self.buoy_bearing
+    
+    def get_closest_buoy(self):
+        self.get_det_results()
+        depth_list_sorted = sorted(self.buoy_depth)
+
+        self.closest_dist = depth_list_sorted[0]
+        closest_index = self.buoy_depth.index(self.closest_dist)
+        self.closest_color = self.buoy_color[closest_index]
+
+        return self.closest_color, self.closest_dist
+    
+    def get_2nd_closest_buoy(self):
+        self.get_det_results()
+        depth_list_sorted = sorted(self.buoy_depth)
+
+        self.second_closest_dist = depth_list_sorted[1]
+        second_closest_index = self.buoy_depth.index(self.second_closest_dist)
+        self.second_closest_color = self.buoy_color[second_closest_index]
+
+        return self.second_closest_color, self.second_closest_dist
+    
+    def check_buoy_gate(self):
+        self.get_det_results()
+        buoy_1, _ = self.get_closest_buoy()
+        buoy_2, _ = self.get_2nd_closest_buoy()
+        
+        if buoy_1 == 'green_buoy' and buoy_2 == 'red_buoy':
+            return True
+        elif buoy_1 == 'red_buoy' and buoy_2 == 'green_buoy':
+            return True
+        else:
+            return False
+        
+    def buoy_GPS_loc(self):
+        if self.check_buoy_gate():
+            print("Buoy gate detected")
+        else: # look for yellow buoy
+            print("Yellow buoy detected")
 
     # def get_det_center(self, results):
     #     self.det_center = []
@@ -90,10 +138,10 @@ class droneVision:
     #     return self.det_center
 
     # def get_det_depth(self, detection_center):
-    #     self.det_depth = []
+    #     self.buoy_depth = []
     #     for i in range(len(detection_center)):
-    #         self.det_depth.append(self.depth_map[int(detection_center[i][1])][int(detection_center[i][0])])
-    #     return self.det_depth
+    #         self.buoy_depth.append(self.depth_map[int(detection_center[i][1])][int(detection_center[i][0])])
+    #     return self.buoy_depth
     
     # def get_det_bearing(self, x_detection):
     #     lamda_x = self.hfov / self.width
@@ -101,34 +149,34 @@ class droneVision:
     #     #Tx = x_detection - (self.cx + self.baseline/2) # set Tx from center of stereo pair
     #     return Tx * lamda_x
 
-    # def det_GPS_loc(self, distance, det_bearing, Martha_lat, Martha_lon, Martha_heading, R=6371e3):
+    # def det_GPS_loc(self, distance, buoy_bearing, Martha_lat, Martha_lon, Martha_heading, R=6371e3):
     #     lat_rad = np.radians(Martha_lat)
     #     lon_rad = np.radians(Martha_lon)
-    #     bearing_rad = np.radians(Martha_heading + det_bearing)
+    #     bearing_rad = np.radians(Martha_heading + buoy_bearing)
 
     #     det_lat = np.arcsin(np.sin(lat_rad) * np.cos(distance/R) + np.cos(lat_rad) * np.sin(distance/R) * np.cos(bearing_rad))
     #     det_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(distance/R) * np.cos(lat_rad), np.cos(distance/R) - np.sin(lat_rad) * np.sin(det_lat))
 
     #     return round(np.degrees(det_lat), 5), round(np.degrees(det_lon), 5)
 
-    def det_GPS_loc(self, detection_center, Martha_lat, Martha_lon, Martha_heading, R=6371e3):
-        self.gps_cords = []
-        for i in range(len(detection_center)):
-            det_depth = self.depth_map[int(detection_center[i][1])][int(detection_center[i][0])]
+    # def det_GPS_loc(self, detection_center, Martha_lat, Martha_lon, Martha_heading, R=6371e3):
+    #     self.gps_cords = []
+    #     for i in range(len(detection_center)):
+    #         buoy_depth = self.depth_map[int(detection_center[i][1])][int(detection_center[i][0])]
             
-            Tx = int(detection_center[i][0]) - self.cx
-            #Tx = x_detection - (self.cx + self.baseline/2) # set Tx from center of stereo pair
-            theta = Tx * self.lamda_x
-            lat_rad = np.radians(Martha_lat)
-            lon_rad = np.radians(Martha_lon)
-            bearing_rad = np.radians(Martha_heading + theta)
+    #         Tx = int(detection_center[i][0]) - self.cx
+    #         #Tx = x_detection - (self.cx + self.baseline/2) # set Tx from center of stereo pair
+    #         theta = Tx * self.lamda_x
+    #         lat_rad = np.radians(Martha_lat)
+    #         lon_rad = np.radians(Martha_lon)
+    #         bearing_rad = np.radians(Martha_heading + theta)
 
-            det_lat = np.arcsin(np.sin(lat_rad) * np.cos(det_depth/R) + np.cos(lat_rad) * np.sin(det_depth/R) * np.cos(bearing_rad))
-            det_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(det_depth/R) * np.cos(lat_rad), np.cos(det_depth/R) - np.sin(lat_rad) * np.sin(det_lat))
+    #         det_lat = np.arcsin(np.sin(lat_rad) * np.cos(buoy_depth/R) + np.cos(lat_rad) * np.sin(buoy_depth/R) * np.cos(bearing_rad))
+    #         det_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(buoy_depth/R) * np.cos(lat_rad), np.cos(buoy_depth/R) - np.sin(lat_rad) * np.sin(det_lat))
 
-            self.gps_cords.append(round(np.degrees(det_lat), 5), round(np.degrees(det_lon), 5))
-        print(self.gps_cords)
-        return self.gps_cords
+    #         self.gps_cords.append(round(np.degrees(det_lat), 5), round(np.degrees(det_lon), 5))
+    #     print(self.gps_cords)
+    #     return self.gps_cords
     
     def set_waypoint(self, det_1_lat, det_1_lon, det_2_lat, det_2_lon):
         wp_lat = (det_1_lat + det_2_lat) / 2
