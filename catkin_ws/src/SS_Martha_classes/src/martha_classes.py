@@ -104,6 +104,7 @@ class droneVision:
         self.closest_bearing = None
 
         depth_list_sorted = sorted(self.buoy_depth)
+
         try:
             self.closest_dist = depth_list_sorted[0]
             closest_index = self.buoy_depth.index(self.closest_dist)
@@ -120,11 +121,11 @@ class droneVision:
             print("Getting second closest buoy")
             print("")
 
-        depth_list_sorted = sorted(self.buoy_depth)
-
         self.second_closest_color = None
         self.second_closest_dist = None
         self.second_closest_bearing = None
+
+        depth_list_sorted = sorted(self.buoy_depth)
 
         try:
             self.second_closest_dist = depth_list_sorted[1]
