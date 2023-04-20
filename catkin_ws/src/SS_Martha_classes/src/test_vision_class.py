@@ -30,9 +30,10 @@ while True:
     print("2nd closest buoy color: ", MarthaVision.second_closest_color)
     print("2nd closest buoy distance: ", MarthaVision.second_closest_dist)
     print("2nd closest buoy bearing: ", MarthaVision.second_closest_bearing)
+    """
 
     print("Buoy gate detected: ", MarthaVision.check_buoy_gate())
-    """
+    
 
     #detection_depth = MarthaVision.get_det_depth(detection_center)
     #gps_loc = MarthaVision.det_GPS_loc(detection_center, lat, lon, heading)

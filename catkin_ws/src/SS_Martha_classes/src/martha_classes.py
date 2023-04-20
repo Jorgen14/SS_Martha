@@ -72,6 +72,7 @@ class droneVision:
     def get_det_results(self):
         if self.DEBUG:
             print("Getting results from detections...")
+            print("")
 
         self.get_image_and_depth_map()
         results = self.get_detections(self.np_img_left)
@@ -96,9 +97,13 @@ class droneVision:
     def get_closest_buoy(self):
         if self.DEBUG:
             print("Getting closest buoy...")
-        self.get_det_results()
+            print("")
+
+        self.closest_color = None
+        self.closest_dist = None
+        self.closest_bearing = None
+
         depth_list_sorted = sorted(self.buoy_depth)
-        
         try:
             self.closest_dist = depth_list_sorted[0]
             closest_index = self.buoy_depth.index(self.closest_dist)
@@ -111,9 +116,16 @@ class droneVision:
         return self.closest_color, self.closest_dist, self.closest_bearing
     
     def get_2nd_closest_buoy(self):
-        self.get_det_results()
+        if self.DEBUG:
+            print("Getting second closest buoy")
+            print("")
+
         depth_list_sorted = sorted(self.buoy_depth)
-        
+
+        self.second_closest_color = None
+        self.second_closest_dist = None
+        self.second_closest_bearing = None
+
         try:
             self.second_closest_dist = depth_list_sorted[1]
             second_closest_index = self.buoy_depth.index(self.second_closest_dist)
@@ -126,10 +138,13 @@ class droneVision:
         return self.second_closest_color, self.second_closest_dist, self.second_closest_bearing
     
     def check_buoy_gate(self):
-        self.get_det_results()
         self.get_closest_buoy()
         self.get_2nd_closest_buoy()
-        
+
+        if self.DEBUG:
+            print("Buoys detected: ", self.closest_color, "and ", self.second_closest_color)
+            print("")
+
         if self.closest_color == 'green_buoy' and self.second_closest_color == 'red_buoy':
             return True
         elif self.closest_color == 'red_buoy' and self.second_closest_color == 'green_buoy':
