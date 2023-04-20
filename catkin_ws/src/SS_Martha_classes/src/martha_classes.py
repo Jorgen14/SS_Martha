@@ -35,6 +35,7 @@ class droneVision:
         self.zed.enable_positional_tracking(positional_tracking_parameters)
 
         self.DEBUG = False
+        self.DEBUG_CAM = False
 
         self.width = self.zed.get_camera_information().camera_resolution.width
         self.height = self.zed.get_camera_information().camera_resolution.height
@@ -66,9 +67,12 @@ class droneVision:
             exit(1)
 
     def get_detections(self, image):
-        return self.model.predict(source=image, conf=0.5, show=self.DEBUG) 
+        return self.model.predict(source=image, conf=0.5, show=self.DEBUG_CAM) 
     
     def get_det_results(self):
+        if self.DEBUG:
+            print("Getting results from detections...")
+
         self.get_image_and_depth_map()
         results = self.get_detections(self.np_img_left)
 
@@ -90,24 +94,34 @@ class droneVision:
         return self.buoy_color, self.buoy_depth, self.buoy_bearing
     
     def get_closest_buoy(self):
+        if self.DEBUG:
+            print("Getting closest buoy...")
         self.get_det_results()
         depth_list_sorted = sorted(self.buoy_depth)
-
-        self.closest_dist = depth_list_sorted[0]
-        closest_index = self.buoy_depth.index(self.closest_dist)
-        self.closest_color = self.buoy_color[closest_index]
-        self.closest_bearing = self.buoy_bearing[closest_index]
+        
+        try:
+            self.closest_dist = depth_list_sorted[0]
+            closest_index = self.buoy_depth.index(self.closest_dist)
+            self.closest_color = self.buoy_color[closest_index]
+            self.closest_bearing = self.buoy_bearing[closest_index]
+        except IndexError:
+            print("Not enough buoys detected!")
+            pass
 
         return self.closest_color, self.closest_dist, self.closest_bearing
     
     def get_2nd_closest_buoy(self):
         self.get_det_results()
         depth_list_sorted = sorted(self.buoy_depth)
-
-        self.second_closest_dist = depth_list_sorted[1]
-        second_closest_index = self.buoy_depth.index(self.second_closest_dist)
-        self.second_closest_color = self.buoy_color[second_closest_index]
-        self.second_closest_bearing = self.buoy_bearing[second_closest_index]
+        
+        try:
+            self.second_closest_dist = depth_list_sorted[1]
+            second_closest_index = self.buoy_depth.index(self.second_closest_dist)
+            self.second_closest_color = self.buoy_color[second_closest_index]
+            self.second_closest_bearing = self.buoy_bearing[second_closest_index]
+        except IndexError:
+            print("Not enough buoys detected")
+            pass
 
         return self.second_closest_color, self.second_closest_dist, self.second_closest_bearing
     

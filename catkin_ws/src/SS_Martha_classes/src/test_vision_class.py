@@ -16,10 +16,11 @@ while True:
     # detections = MarthaVision.get_detections(img_left)
 
     MarthaVision.get_det_results()
-    print("Buoys: ", MarthaVision.buoy_color)
-    print("Buoy depth: ", MarthaVision.buoy_depth)
-    print("Buoy bearing: ", MarthaVision.buoy_bearing)
+    #print("Buoys: ", MarthaVision.buoy_color)
+    #print("Buoy depth: ", MarthaVision.buoy_depth)
+    #print("Buoy bearing: ", MarthaVision.buoy_bearing)
 
+    """
     MarthaVision.get_closest_buoy()
     print("Closest buoy color: ", MarthaVision.closest_color)
     print("Closest buoy distance: ", MarthaVision.closest_dist)
@@ -31,6 +32,7 @@ while True:
     print("2nd closest buoy bearing: ", MarthaVision.second_closest_bearing)
 
     print("Buoy gate detected: ", MarthaVision.check_buoy_gate())
+    """
 
     #detection_depth = MarthaVision.get_det_depth(detection_center)
     #gps_loc = MarthaVision.det_GPS_loc(detection_center, lat, lon, heading)
