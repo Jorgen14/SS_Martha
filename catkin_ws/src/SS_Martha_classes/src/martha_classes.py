@@ -96,8 +96,9 @@ class droneVision:
         self.closest_dist = depth_list_sorted[0]
         closest_index = self.buoy_depth.index(self.closest_dist)
         self.closest_color = self.buoy_color[closest_index]
+        self.closest_bearing = self.buoy_bearing[closest_index]
 
-        return self.closest_color, self.closest_dist
+        return self.closest_color, self.closest_dist, self.closest_bearing
     
     def get_2nd_closest_buoy(self):
         self.get_det_results()
@@ -106,26 +107,55 @@ class droneVision:
         self.second_closest_dist = depth_list_sorted[1]
         second_closest_index = self.buoy_depth.index(self.second_closest_dist)
         self.second_closest_color = self.buoy_color[second_closest_index]
+        self.second_closest_bearing = self.buoy_bearing[second_closest_index]
 
-        return self.second_closest_color, self.second_closest_dist
+        return self.second_closest_color, self.second_closest_dist, self.second_closest_bearing
     
     def check_buoy_gate(self):
         self.get_det_results()
-        buoy_1, _ = self.get_closest_buoy()
-        buoy_2, _ = self.get_2nd_closest_buoy()
+        self.get_closest_buoy()
+        self.get_2nd_closest_buoy()
         
-        if buoy_1 == 'green_buoy' and buoy_2 == 'red_buoy':
+        if self.closest_color == 'green_buoy' and self.second_closest_color == 'red_buoy':
             return True
-        elif buoy_1 == 'red_buoy' and buoy_2 == 'green_buoy':
+        elif self.closest_color == 'red_buoy' and self.second_closest_color == 'green_buoy':
             return True
         else:
-            return False
+            return False # If false look for yellow buoy, -> get yellow buoy GPS loc from own function
         
-    def buoy_GPS_loc(self):
+    def buoy_GPS_loc(self, drone_lat, drone_lon, drone_heading, R=6371e3):
+        self.get_closest_buoy()
+        self.get_2nd_closest_buoy()
+        
+        self.closest_GPS = []
+        self.second_closest_GPS = []
+
+        drone_lat_rad = np.radians(drone_lat)
+        drone_lon_rad = np.radians(drone_lon)
+        closest_bearing_rad = np.radians(drone_heading + self.closest_bearing) # With respect to North
+        second_closest_bearing_rad = np.radians(drone_heading + self.second_closest_bearing)
+
+        closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad))
+        closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat))
+        self.closest_GPS.append(np.degrees(closest_buoy_lat), np.degrees(closest_buoy_lon))
+
+        second_closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad))
+        second_closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat))
+        self.second_closest_GPS.append(np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon))
+
+        return self.closest_GPS, self.second_closest_GPS
+    
+    # def yellow_buoy_GPS_loc(self): # Make transit to waypoint function, and look for yellow buoy while transiting
+
+    def set_waypoint(self):
         if self.check_buoy_gate():
-            print("Buoy gate detected")
-        else: # look for yellow buoy
-            print("Yellow buoy detected")
+            self.buoy_GPS_loc()
+            self.wp_lat = (self.closest_GPS[0] + self.second_closest_GPS[0]) / 2
+            self.wp_lon = (self.closest_GPS[1] + self.second_closest_GPS[1]) / 2
+            return self.wp_lat, self.wp_lon
+        # elif look for yellow buoy
+        else:  
+            print("No buoy gate found. Searching for gate...")
 
     # def get_det_center(self, results):
     #     self.det_center = []
@@ -154,10 +184,10 @@ class droneVision:
     #     lon_rad = np.radians(Martha_lon)
     #     bearing_rad = np.radians(Martha_heading + buoy_bearing)
 
-    #     det_lat = np.arcsin(np.sin(lat_rad) * np.cos(distance/R) + np.cos(lat_rad) * np.sin(distance/R) * np.cos(bearing_rad))
-    #     det_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(distance/R) * np.cos(lat_rad), np.cos(distance/R) - np.sin(lat_rad) * np.sin(det_lat))
+    #     buoy_lat = np.arcsin(np.sin(lat_rad) * np.cos(distance/R) + np.cos(lat_rad) * np.sin(distance/R) * np.cos(bearing_rad))
+    #     buoy_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(distance/R) * np.cos(lat_rad), np.cos(distance/R) - np.sin(lat_rad) * np.sin(buoy_lat))
 
-    #     return round(np.degrees(det_lat), 5), round(np.degrees(det_lon), 5)
+    #     return round(np.degrees(buoy_lat), 5), round(np.degrees(buoy_lon), 5)
 
     # def det_GPS_loc(self, detection_center, Martha_lat, Martha_lon, Martha_heading, R=6371e3):
     #     self.gps_cords = []
@@ -171,15 +201,11 @@ class droneVision:
     #         lon_rad = np.radians(Martha_lon)
     #         bearing_rad = np.radians(Martha_heading + theta)
 
-    #         det_lat = np.arcsin(np.sin(lat_rad) * np.cos(buoy_depth/R) + np.cos(lat_rad) * np.sin(buoy_depth/R) * np.cos(bearing_rad))
-    #         det_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(buoy_depth/R) * np.cos(lat_rad), np.cos(buoy_depth/R) - np.sin(lat_rad) * np.sin(det_lat))
+    #         buoy_lat = np.arcsin(np.sin(lat_rad) * np.cos(buoy_depth/R) + np.cos(lat_rad) * np.sin(buoy_depth/R) * np.cos(bearing_rad))
+    #         buoy_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(buoy_depth/R) * np.cos(lat_rad), np.cos(buoy_depth/R) - np.sin(lat_rad) * np.sin(buoy_lat))
 
-    #         self.gps_cords.append(round(np.degrees(det_lat), 5), round(np.degrees(det_lon), 5))
+    #         self.gps_cords.append(round(np.degrees(buoy_lat), 5), round(np.degrees(buoy_lon), 5))
     #     print(self.gps_cords)
     #     return self.gps_cords
     
-    def set_waypoint(self, det_1_lat, det_1_lon, det_2_lat, det_2_lon):
-        wp_lat = (det_1_lat + det_2_lat) / 2
-        wp_lon = (det_1_lon + det_2_lon) / 2
-        return wp_lat, wp_lon
     
