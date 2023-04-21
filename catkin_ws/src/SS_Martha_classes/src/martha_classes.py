@@ -42,8 +42,6 @@ class droneVision:
         positional_tracking_parameters = sl.PositionalTrackingParameters()
         self.zed.enable_positional_tracking(positional_tracking_parameters)
 
-        
-
         self.width = self.zed.get_camera_information().camera_resolution.width
         self.height = self.zed.get_camera_information().camera_resolution.height
         self.hfov = self.zed.get_camera_information().camera_configuration.calibration_parameters.left_cam.h_fov
@@ -193,6 +191,8 @@ class droneVision:
         # elif look for yellow buoy
         else:  
             print("No buoy gate found. Searching for gate...")
+
+
 
 class droneData:
     def __init__(self, DEBUG=False):

@@ -28,16 +28,15 @@ while True:
 
         print("Buoy gate detected: ", MarthaVision.check_buoy_gate())
         
-
-        #detection_depth = MarthaVision.get_det_depth(detection_center)
-        #gps_loc = MarthaVision.det_GPS_loc(detection_center, lat, lon, heading)
+        # MarthaVision.buoy_GPS_loc(MarthaData.drone_lat, MarthaData.drone_lon, MarthaData.drone_heading)
+        # print("Buoy GPS location: ", MarthaVision.closest_GPS, MarthaVision.second_closest_GPS)
 
     if TEST_DATA:
-        print("Latitude, longitude, heading: " ,MarthaData.drone_lat, MarthaData.drone_lon, MarthaData.drone_heading)
+        print("Latitude, longitude, heading: ", MarthaData.drone_lat, MarthaData.drone_lon, MarthaData.drone_heading)
         print("")
-        print("Linear speed x and y: " ,MarthaData.lin_vel_x, MarthaData.lin_vel_y)
+        print("Linear speed x and y: ", MarthaData.lin_vel_x, MarthaData.lin_vel_y)
         print("")
-        print("Angular speed z: " ,MarthaData.ang_vel_z)
+        print("Angular speed z: ", MarthaData.ang_vel_z)
         print("")
         print("Waypoint reached: ", MarthaData.waypoint_reached)
         print("")
