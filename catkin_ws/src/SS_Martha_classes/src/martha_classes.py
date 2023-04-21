@@ -1,9 +1,17 @@
 import numpy as np
 import pyzed.sl as sl
 from ultralytics import YOLO
+import rospy
+from sensor_msgs.msg import NavSatFix
+from std_msgs.msg import Float64
+from geometry_msgs.msg import TwistStamped
+from mavros_msgs.msg import WaypointReached
 
 class droneVision:
-    def __init__(self):
+    def __init__(self, DEBUG=False, DEBUG_CAM=False):
+        self.DEBUG = DEBUG
+        self.DEBUG_CAM = DEBUG_CAM
+
         self.zed = sl.Camera()
         init_params = sl.InitParameters()
         init_params.camera_resolution = sl.RESOLUTION.HD1080
@@ -34,8 +42,7 @@ class droneVision:
         positional_tracking_parameters = sl.PositionalTrackingParameters()
         self.zed.enable_positional_tracking(positional_tracking_parameters)
 
-        self.DEBUG = False
-        self.DEBUG_CAM = False
+        
 
         self.width = self.zed.get_camera_information().camera_resolution.width
         self.height = self.zed.get_camera_information().camera_resolution.height
@@ -187,55 +194,27 @@ class droneVision:
         else:  
             print("No buoy gate found. Searching for gate...")
 
-    # def get_det_center(self, results):
-    #     self.det_center = []
-    #     for result in results:
-    #         boxes = result.boxes.xyxy
-    #     for i in range(len(boxes)):
-    #         center = ((boxes[i, 2].item() - boxes[i, 0]).item() / 2 + boxes[i, 0].item(), 
-    #                   (boxes[i, 3].item() - boxes[i, 1].item()) / 2 + boxes[i, 1].item())
-    #         self.det_center.append(center)
-    #     return self.det_center
+class droneData:
+    def __init__(self, DEBUG=False):
+        self.DEBUG = DEBUG
 
-    # def get_det_depth(self, detection_center):
-    #     self.buoy_depth = []
-    #     for i in range(len(detection_center)):
-    #         self.buoy_depth.append(self.depth_map[int(detection_center[i][1])][int(detection_center[i][0])])
-    #     return self.buoy_depth
+        self.sub_GPS = rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.gps_callback)
+        self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
+        self.sub_vel = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.vel_callback)
+        self.sub_wp_reached = rospy.Subscriber("/mavros/mission/reached", WaypointReached, self.wp_reached_callback)
+
+    def gps_callback(self, msg):
+        self.drone_lat = msg.latitude
+        self.drone_lon = msg.longitude
     
-    # def get_det_bearing(self, x_detection):
-    #     lamda_x = self.hfov / self.width
-    #     Tx = x_detection - self.cx
-    #     #Tx = x_detection - (self.cx + self.baseline/2) # set Tx from center of stereo pair
-    #     return Tx * lamda_x
-
-    # def det_GPS_loc(self, distance, buoy_bearing, Martha_lat, Martha_lon, Martha_heading, R=6371e3):
-    #     lat_rad = np.radians(Martha_lat)
-    #     lon_rad = np.radians(Martha_lon)
-    #     bearing_rad = np.radians(Martha_heading + buoy_bearing)
-
-    #     buoy_lat = np.arcsin(np.sin(lat_rad) * np.cos(distance/R) + np.cos(lat_rad) * np.sin(distance/R) * np.cos(bearing_rad))
-    #     buoy_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(distance/R) * np.cos(lat_rad), np.cos(distance/R) - np.sin(lat_rad) * np.sin(buoy_lat))
-
-    #     return round(np.degrees(buoy_lat), 5), round(np.degrees(buoy_lon), 5)
-
-    # def det_GPS_loc(self, detection_center, Martha_lat, Martha_lon, Martha_heading, R=6371e3):
-    #     self.gps_cords = []
-    #     for i in range(len(detection_center)):
-    #         buoy_depth = self.depth_map[int(detection_center[i][1])][int(detection_center[i][0])]
-            
-    #         Tx = int(detection_center[i][0]) - self.cx
-    #         #Tx = x_detection - (self.cx + self.baseline/2) # set Tx from center of stereo pair
-    #         theta = Tx * self.lamda_x
-    #         lat_rad = np.radians(Martha_lat)
-    #         lon_rad = np.radians(Martha_lon)
-    #         bearing_rad = np.radians(Martha_heading + theta)
-
-    #         buoy_lat = np.arcsin(np.sin(lat_rad) * np.cos(buoy_depth/R) + np.cos(lat_rad) * np.sin(buoy_depth/R) * np.cos(bearing_rad))
-    #         buoy_lon = lon_rad + np.arctan2(np.sin(bearing_rad) * np.sin(buoy_depth/R) * np.cos(lat_rad), np.cos(buoy_depth/R) - np.sin(lat_rad) * np.sin(buoy_lat))
-
-    #         self.gps_cords.append(round(np.degrees(buoy_lat), 5), round(np.degrees(buoy_lon), 5))
-    #     print(self.gps_cords)
-    #     return self.gps_cords
+    def heading_callback(self, msg):
+        self.drone_heading = msg.data
     
-    
+    def vel_callback(self, msg):
+        self.lin_vel_x = msg.twist.linear.x
+        self.lin_vel_y = msg.twist.linear.y
+        self.ang_vel_z = msg.twist.angular.z
+
+    def wp_reached_callback(self, msg):
+        self.wp_reached = msg.wp_seq
+        
