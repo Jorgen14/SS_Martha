@@ -1,0 +1,7 @@
+<launch>
+	<node pkg="SS_Martha_classes"
+	  type="test_classes.py"
+	  name="TestNode"
+	  output="screen">
+	</node>
+</launch>

@@ -1,6 +1,10 @@
+#!/usr/bin/env python3.8
+import rospy
 import cv2 as cv
 from martha_classes import droneVision, droneData
-from keyboard import is_pressed
+#from keyboard import is_pressed
+
+rospy.init_node("TestNode")
 
 TEST_VISION = False
 TEST_DATA = True
@@ -38,11 +42,13 @@ while True:
         print("")
         print("Angular speed z: ", MarthaData.ang_vel_z)
         print("")
-        print("Waypoint reached: ", MarthaData.waypoint_reached)
+        print("Waypoint reached: ", MarthaData.wp_reached)
         print("")
 
-    if is_pressed('q'):
-        break
+    #if is_pressed('q'):
+    #    break
+    
+    rospy.spin()
 
 MarthaVision.zed.close()
 
