@@ -202,8 +202,6 @@ class droneData:
         self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
         self.sub_vel = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.vel_callback)
         self.sub_wp_reached = rospy.Subscriber("/mavros/mission/reached", WaypointReached, self.wp_reached_callback)
-
-        rospy.spin()
         
         self.drone_lat = None
         self.drone_lon = None
@@ -214,11 +212,19 @@ class droneData:
         self.wp_reached = None
 
     def gps_callback(self, msg):
+        if self.DEBUG:
+            print("Getting GPS location...")
         self.drone_lat = msg.latitude
         self.drone_lon = msg.longitude
+        if self.DEBUG:
+            print("GPS data fetched!")
     
     def heading_callback(self, msg):
+        if self.DEBUG:
+            print("Getiing heading...")
         self.drone_heading = msg.data
+        if self.DEBUG:
+            print("Heading fetched...")
     
     def vel_callback(self, msg):
         self.lin_vel_x = msg.twist.linear.x

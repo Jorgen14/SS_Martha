@@ -6,13 +6,17 @@ from martha_classes import droneVision, droneData
 
 rospy.init_node("TestNode")
 
-TEST_VISION = False
+TEST_VISION = True
 TEST_DATA = True
+rate = rospy.Rate(10)
 
-MarthaVision = droneVision(DEBUG=True)
-MarthaData = droneData()
+if TEST_VISION:
+    MarthaVision = droneVision(DEBUG=True)
+if TEST_DATA:
+    MarthaData = droneData(DEBUG=True)
 
 while not rospy.is_shutdown():
+#if __name__ == '__main__':
     if TEST_VISION:
         MarthaVision.get_det_results()
         #print("Buoys: ", MarthaVision.buoy_color)
@@ -31,21 +35,25 @@ while not rospy.is_shutdown():
         print("2nd closest buoy bearing: ", MarthaVision.second_closest_bearing)
         """
 
-        print("Buoy gate detected: ", MarthaVision.check_buoy_gate())
+        #print("Buoy gate detected: ", MarthaVision.check_buoy_gate())
         
-        # MarthaVision.buoy_GPS_loc(MarthaData.drone_lat, MarthaData.drone_lon, MarthaData.drone_heading)
-        # print("Buoy GPS location: ", MarthaVision.closest_GPS, MarthaVision.second_closest_GPS)
+        MarthaVision.buoy_GPS_loc(MarthaData.drone_lat, MarthaData.drone_lon, MarthaData.drone_heading)
+        print("Buoy GPS location: ", MarthaVision.closest_GPS, MarthaVision.second_closest_GPS)
+        print("")
 
     if TEST_DATA:
         print("Latitude, longitude, heading: ", MarthaData.drone_lat, MarthaData.drone_lon, MarthaData.drone_heading)
         print("")
+        """
         print("Linear speed x and y: ", MarthaData.lin_vel_x, MarthaData.lin_vel_y)
         print("")
         print("Angular speed z: ", MarthaData.ang_vel_z)
         print("")
         print("Waypoint reached: ", MarthaData.wp_reached)
         print("")
-
+        """
+        
+    rate.sleep()
     #if is_pressed('q'):
     #    break
 
