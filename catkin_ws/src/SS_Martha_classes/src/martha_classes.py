@@ -8,6 +8,9 @@ from geometry_msgs.msg import TwistStamped
 from mavros_msgs.msg import WaypointReached
 
 class droneVision:
+
+    GPS_round = 6
+
     def __init__(self, DEBUG=False, DEBUG_CAM=False):
         self.DEBUG = DEBUG
         self.DEBUG_CAM = DEBUG_CAM
@@ -50,67 +53,52 @@ class droneVision:
         self.lamda_x = self.hfov / self.width
 
         self.img_left = sl.Mat()
-        self.img_depth = sl.Mat()
+        self.depth_map = sl.Mat()
 
         self.model = YOLO('/home/navo/GitHub/SS_Martha/catkin_ws/src/SS_Martha_classes/src/buoy_detect.pt') 
 
         print("ZED Camera initialized")
 
-    def get_image_and_depth_map(self): # Return anything?
+    def _image_and_depth_map(self):
         if self.zed.grab(self.runtime_params) == sl.ERROR_CODE.SUCCESS:
-
             self.zed.retrieve_image(self.img_left, sl.VIEW.LEFT)
-            np_img_left_4ch = self.img_left.get_data()
-            self.np_img_left = np_img_left_4ch[:,:,:3] # Remove alpha channel
-
-            self.zed.retrieve_measure(self.img_depth, sl.MEASURE.DEPTH) # May need to change resolution
-            self.depth_map = self.img_depth.get_data()
-
-            return self.np_img_left, self.depth_map
+            self.img_left = self.img_left.get_data()
+            self.img_left = self.img_left[:,:,:3] # Remove alpha channel
+            self.zed.retrieve_measure(self.depth_map, sl.MEASURE.DEPTH)
+            self.depth_map = self.depth_map.get_data()
         else:
             print("Error grabbing image")
             exit(1)
 
-    def get_detections(self, image):
-        return self.model.predict(source=image, conf=0.5, show=self.DEBUG_CAM) 
+    def _get_detections(self):
+        return self.model.predict(source=self.img_left, conf=0.5, show=self.DEBUG_CAM) 
     
-    def get_det_results(self):
+    def detection_results(self):
         if self.DEBUG:
-            print("Getting results from detections...")
+            print("Getting detection results...")
             print("")
+    
+        self._image_and_depth_map()
+        results = self._get_detections()
 
-        self.get_image_and_depth_map()
-        
-        if self.DEBUG:
-            print("Image and depth map fetched!")
-            print("")
-        
-        results = self.get_detections(self.np_img_left)
-
-        if self.DEBUG:
-            print("Results fetched!")
-            print("")
-
-        self.buoy_color = []
-        self.buoy_depth = []
-        self.buoy_bearing = []
+        self.color_list = []
+        self.depth_list = []
+        self.bearing_list = []
 
         for result in results:
             for box in result.boxes.xyxy:
                 center = ((box[2].item() - box[0].item()) / 2 + box[0].item(), 
                           (box[3].item() - box[1].item()) / 2 + box[1].item())
-                self.buoy_depth.append(self.depth_map[int(center[1])][int(center[0])])
+                self.depth_list.append(self.depth_map[int(center[1])][int(center[0])])
                 Tx = int(center[0]) - self.cx
                 theta = Tx * self.lamda_x
-                self.buoy_bearing.append(theta)
+                self.bearing_list.append(theta)
             for d_cls in result.boxes.cls:
-                self.buoy_color.append(self.model.names[int(d_cls)])
+                self.color_list.append(self.model.names[int(d_cls)])
 
         if self.DEBUG:
             print("Results prosseced!")
             print("")
-
-        return self.buoy_color, self.buoy_depth, self.buoy_bearing
     
     def get_closest_buoy(self):
         if self.DEBUG:
@@ -122,22 +110,21 @@ class droneVision:
         self.closest_bearing = None
         self.closest_is_none = True
 
-        depth_list_sorted = sorted(self.buoy_depth)
-
+        depth_list_sorted = sorted(self.depth_list)
         try:
             self.closest_dist = depth_list_sorted[0]
-            closest_index = self.buoy_depth.index(self.closest_dist)
-            self.closest_color = self.buoy_color[closest_index]
-            self.closest_bearing = self.buoy_bearing[closest_index]
+            closest_index = self.depth_list.index(self.closest_dist)
+            self.closest_color = self.color_list[closest_index]
+            self.closest_bearing = self.bearing_list[closest_index]
             self.closest_is_none = False
         except IndexError:
-            print("Not enough buoys detected!")
+            print("No buoys detected!")
             print("")
             pass
     
     def get_2nd_closest_buoy(self):
         if self.DEBUG:
-            print("Getting second closest buoy")
+            print("Getting second closest buoy...")
             print("")
 
         self.second_closest_color = None
@@ -145,23 +132,19 @@ class droneVision:
         self.second_closest_bearing = None
         self.second_is_none = True
 
-        depth_list_sorted = sorted(self.buoy_depth)
-
+        depth_list_sorted = sorted(self.depth_list)
         try:
             self.second_closest_dist = depth_list_sorted[1]
-            second_closest_index = self.buoy_depth.index(self.second_closest_dist)
-            self.second_closest_color = self.buoy_color[second_closest_index]
-            self.second_closest_bearing = self.buoy_bearing[second_closest_index]
+            second_closest_index = self.depth_list.index(self.second_closest_dist)
+            self.second_closest_color = self.color_list[second_closest_index]
+            self.second_closest_bearing = self.bearing_list[second_closest_index]
             self.second_is_none = False
         except IndexError:
-            print("Not enough buoys detected")
+            print("Only one buoy detected!")
             print("")
             pass
     
     def check_buoy_gate(self):
-        self.get_closest_buoy()
-        self.get_2nd_closest_buoy()
-
         if self.DEBUG:
             print("Buoys detected: ", self.closest_color, "and ", self.second_closest_color)
             print("")
@@ -173,42 +156,34 @@ class droneVision:
         else:
             return False # If false look for yellow buoy, -> get yellow buoy GPS loc from own function
         
-    def buoy_GPS_loc(self, drone_lat, drone_lon, drone_heading, R=6371e3):
-        self.get_closest_buoy()
-        self.get_2nd_closest_buoy()
-        
+    def buoy_GPS_loc(self, drone_lat, drone_lon, drone_heading, R=6371e3):        
         self.closest_GPS = []
         self.second_closest_GPS = []
 
-        if not self.closest_is_none and not self.second_is_none:
-            drone_lat_rad = np.radians(drone_lat)
-            drone_lon_rad = np.radians(drone_lon)
-            closest_bearing_rad = np.radians(drone_heading + self.closest_bearing) # With respect to North
-            second_closest_bearing_rad = np.radians(drone_heading + self.second_closest_bearing)
+        drone_lat_rad = np.radians(drone_lat)
+        drone_lon_rad = np.radians(drone_lon)
 
-            closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad))
-            closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat))
+        if not self.closest_is_none:
+            closest_bearing_rad = np.radians(drone_heading + self.closest_bearing) # With respect to North
+            closest_buoy_lat = round(np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad)), self.GPS_round)
+            closest_buoy_lon = round(drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat)), self.GPS_round)
             self.closest_GPS.append((np.degrees(closest_buoy_lat), np.degrees(closest_buoy_lon)))
 
-            second_closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad))
-            second_closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat))
-            self.second_closest_GPS.append((np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon)))
+            if not self.second_is_none and not self.closest_color == 'yellow_buoy':
+                second_closest_bearing_rad = np.radians(drone_heading + self.second_closest_bearing) # With respect to North
+                second_closest_buoy_lat = round(np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad)), self.GPS_round)
+                second_closest_buoy_lon = round(drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat)), self.GPS_round)
+                self.second_closest_GPS.append((np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon)))
+            else:
+                print("Only one buoy detected!")
         
         else:
-            print("Not enough buoys detected!")
-            pass
-    
-    # def yellow_buoy_GPS_loc(self): # Make transit to waypoint function, and look for yellow buoy while transiting
+            print("No buoys detected!")
 
     def set_waypoint(self):
-        if self.check_buoy_gate():
-            self.buoy_GPS_loc()
-            self.wp_lat = (self.closest_GPS[0] + self.second_closest_GPS[0]) / 2
-            self.wp_lon = (self.closest_GPS[1] + self.second_closest_GPS[1]) / 2
-            return self.wp_lat, self.wp_lon
-        # elif look for yellow buoy
-        else:  
-            print("No buoy gate found. Searching for gate...")
+        self.wp_lat = (self.closest_GPS[0] + self.second_closest_GPS[0]) / 2
+        self.wp_lon = (self.closest_GPS[1] + self.second_closest_GPS[1]) / 2
+        return self.wp_lat, self.wp_lon
 
 
 
@@ -221,31 +196,21 @@ class droneData:
         self.sub_vel = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.vel_callback)
         self.sub_wp_reached = rospy.Subscriber("/mavros/mission/reached", WaypointReached, self.wp_reached_callback)
         
-        self.drone_lat = None
-        self.drone_lon = None
-        self.drone_heading = None
+        self.lat = None
+        self.lon = None
+        self.heading = None
         self.lin_vel_x = None
         self.lin_vel_y = None
         self.ang_vel_z = None
         self.wp_reached = None
 
     def gps_callback(self, msg):
-        if self.DEBUG:
-            print("Getting GPS location...")
-        self.drone_lat = msg.latitude
-        self.drone_lon = msg.longitude
-        if self.DEBUG:
-            print("GPS data fetched!")
-            print("")
+        self.lat = msg.latitude
+        self.lon = msg.longitude
     
     def heading_callback(self, msg):
-        if self.DEBUG:
-            print("Getting heading...")
-        self.drone_heading = msg.data
-        if self.DEBUG:
-            print("Heading fetched...")
-            print("")
-    
+        self.heading = msg.data
+
     def vel_callback(self, msg):
         self.lin_vel_x = msg.twist.linear.x
         self.lin_vel_y = msg.twist.linear.y
@@ -253,4 +218,3 @@ class droneData:
 
     def wp_reached_callback(self, msg):
         self.wp_reached = msg.wp_seq
-        
