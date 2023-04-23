@@ -8,10 +8,11 @@ rospy.init_node("TestNode")
 
 TEST_VISION = False
 TEST_DATA = True
+
 MarthaVision = droneVision(DEBUG=True)
 MarthaData = droneData()
 
-while True:
+while not rospy.is_shutdown():
     if TEST_VISION:
         MarthaVision.get_det_results()
         #print("Buoys: ", MarthaVision.buoy_color)
@@ -47,8 +48,6 @@ while True:
 
     #if is_pressed('q'):
     #    break
-    
-    rospy.spin()
 
 MarthaVision.zed.close()
 
