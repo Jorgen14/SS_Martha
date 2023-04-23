@@ -97,6 +97,10 @@ class droneVision:
             for d_cls in result.boxes.cls:
                 self.buoy_color.append(self.model.names[int(d_cls)])
 
+        if self.DEBUG:
+            print("Results fetched!")
+            print("")
+
         return self.buoy_color, self.buoy_depth, self.buoy_bearing
     
     def get_closest_buoy(self):
@@ -107,6 +111,7 @@ class droneVision:
         self.closest_color = None
         self.closest_dist = None
         self.closest_bearing = None
+        self.closest_is_none = True
 
         depth_list_sorted = sorted(self.buoy_depth)
 
@@ -115,11 +120,11 @@ class droneVision:
             closest_index = self.buoy_depth.index(self.closest_dist)
             self.closest_color = self.buoy_color[closest_index]
             self.closest_bearing = self.buoy_bearing[closest_index]
+            self.closest_is_none = False
         except IndexError:
             print("Not enough buoys detected!")
+            print("")
             pass
-
-        return self.closest_color, self.closest_dist, self.closest_bearing
     
     def get_2nd_closest_buoy(self):
         if self.DEBUG:
@@ -129,6 +134,7 @@ class droneVision:
         self.second_closest_color = None
         self.second_closest_dist = None
         self.second_closest_bearing = None
+        self.second_is_none = True
 
         depth_list_sorted = sorted(self.buoy_depth)
 
@@ -137,11 +143,11 @@ class droneVision:
             second_closest_index = self.buoy_depth.index(self.second_closest_dist)
             self.second_closest_color = self.buoy_color[second_closest_index]
             self.second_closest_bearing = self.buoy_bearing[second_closest_index]
+            self.second_is_none = False
         except IndexError:
             print("Not enough buoys detected")
+            print("")
             pass
-
-        return self.second_closest_color, self.second_closest_dist, self.second_closest_bearing
     
     def check_buoy_gate(self):
         self.get_closest_buoy()
@@ -165,20 +171,23 @@ class droneVision:
         self.closest_GPS = []
         self.second_closest_GPS = []
 
-        drone_lat_rad = np.radians(drone_lat)
-        drone_lon_rad = np.radians(drone_lon)
-        closest_bearing_rad = np.radians(drone_heading + self.closest_bearing) # With respect to North
-        second_closest_bearing_rad = np.radians(drone_heading + self.second_closest_bearing)
+        if not self.closest_is_none or not self.second_is_none:
+            drone_lat_rad = np.radians(drone_lat)
+            drone_lon_rad = np.radians(drone_lon)
+            closest_bearing_rad = np.radians(drone_heading + self.closest_bearing) # With respect to North
+            second_closest_bearing_rad = np.radians(drone_heading + self.second_closest_bearing)
 
-        closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad))
-        closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat))
-        self.closest_GPS.append(np.degrees(closest_buoy_lat), np.degrees(closest_buoy_lon))
+            closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad))
+            closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat))
+            self.closest_GPS.append(np.degrees(closest_buoy_lat), np.degrees(closest_buoy_lon))
 
-        second_closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad))
-        second_closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat))
-        self.second_closest_GPS.append(np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon))
-
-        return self.closest_GPS, self.second_closest_GPS
+            second_closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad))
+            second_closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat))
+            self.second_closest_GPS.append(np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon))
+        
+        else:
+            print("Not enough buoys detected!")
+            pass
     
     # def yellow_buoy_GPS_loc(self): # Make transit to waypoint function, and look for yellow buoy while transiting
 
@@ -218,13 +227,15 @@ class droneData:
         self.drone_lon = msg.longitude
         if self.DEBUG:
             print("GPS data fetched!")
+            print("")
     
     def heading_callback(self, msg):
         if self.DEBUG:
-            print("Getiing heading...")
+            print("Getting heading...")
         self.drone_heading = msg.data
         if self.DEBUG:
             print("Heading fetched...")
+            print("")
     
     def vel_callback(self, msg):
         self.lin_vel_x = msg.twist.linear.x
