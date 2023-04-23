@@ -52,7 +52,7 @@ class droneVision:
         self.img_left = sl.Mat()
         self.img_depth = sl.Mat()
 
-        self.model = YOLO('buoy_detect.pt') 
+        self.model = YOLO('/home/navo/GitHub/SS_Martha/catkin_ws/src/SS_Martha_classes/src/buoy_detect.pt') 
 
         print("ZED Camera initialized")
 
