@@ -80,7 +80,16 @@ class droneVision:
             print("")
 
         self.get_image_and_depth_map()
+        
+        if self.DEBUG:
+            print("Image and depth map fetched!")
+            print("")
+        
         results = self.get_detections(self.np_img_left)
+
+        if self.DEBUG:
+            print("Results fetched!")
+            print("")
 
         self.buoy_color = []
         self.buoy_depth = []
@@ -98,7 +107,7 @@ class droneVision:
                 self.buoy_color.append(self.model.names[int(d_cls)])
 
         if self.DEBUG:
-            print("Results fetched!")
+            print("Results prosseced!")
             print("")
 
         return self.buoy_color, self.buoy_depth, self.buoy_bearing
@@ -171,7 +180,7 @@ class droneVision:
         self.closest_GPS = []
         self.second_closest_GPS = []
 
-        if not self.closest_is_none or not self.second_is_none:
+        if not self.closest_is_none and not self.second_is_none:
             drone_lat_rad = np.radians(drone_lat)
             drone_lon_rad = np.radians(drone_lon)
             closest_bearing_rad = np.radians(drone_heading + self.closest_bearing) # With respect to North
@@ -179,11 +188,11 @@ class droneVision:
 
             closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad))
             closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat))
-            self.closest_GPS.append(np.degrees(closest_buoy_lat), np.degrees(closest_buoy_lon))
+            self.closest_GPS.append((np.degrees(closest_buoy_lat), np.degrees(closest_buoy_lon)))
 
             second_closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad))
             second_closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat))
-            self.second_closest_GPS.append(np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon))
+            self.second_closest_GPS.append((np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon)))
         
         else:
             print("Not enough buoys detected!")

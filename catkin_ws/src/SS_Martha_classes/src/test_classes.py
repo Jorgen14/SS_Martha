@@ -2,7 +2,7 @@
 import rospy
 import cv2 as cv
 from martha_classes import droneVision, droneData
-#from keyboard import is_pressed
+from datetime import datetime
 
 rospy.init_node("TestNode")
 
@@ -17,13 +17,16 @@ MarthaData = droneData(DEBUG=True)
 
 while not rospy.is_shutdown():
 #if __name__ == '__main__' :
+    startTime = datetime.now()
     try:
+        print("In try")
         if TEST_VISION:
+            print("In if sentence")
             MarthaVision.get_det_results()
             #print("Buoys: ", MarthaVision.buoy_color)
             #print("Buoy depth: ", MarthaVision.buoy_depth)
             #print("Buoy bearing: ", MarthaVision.buoy_bearing)
-
+  
             """
             MarthaVision.get_closest_buoy()
             print("Closest buoy color: ", MarthaVision.closest_color)
@@ -37,7 +40,7 @@ while not rospy.is_shutdown():
             """
 
             #print("Buoy gate detected: ", MarthaVision.check_buoy_gate())
-        
+            print("Calculating buoy GPS location...") 
             MarthaVision.buoy_GPS_loc(MarthaData.drone_lat, MarthaData.drone_lon, MarthaData.drone_heading)
             print("Buoy GPS location: ", MarthaVision.closest_GPS, MarthaVision.second_closest_GPS)
             print("")
@@ -54,6 +57,7 @@ while not rospy.is_shutdown():
             print("")
             """
         
+        print("Script time: ", datetime.now()-startTime)
         rate.sleep()
         #if is_pressed('q'):
         #    break
