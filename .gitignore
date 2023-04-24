@@ -1,9 +1,9 @@
 # User defined
 *.whl
-YOLOv8/Training/images
-YOLOv8/Training/labels
-YOLOv8/Validation/images
-YOLOv8/Validation/labels
+# YOLOv8/Training/images
+# YOLOv8/Training/labels
+# YOLOv8/Validation/images
+# YOLOv8/Validation/labels
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
