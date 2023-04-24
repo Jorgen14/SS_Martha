@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import pyzed.sl as sl
 from ultralytics import YOLO
@@ -57,9 +58,12 @@ class droneVision:
 
         self.model = YOLO('/home/navo/GitHub/SS_Martha/catkin_ws/src/SS_Martha_classes/src/buoy_detect.pt') 
 
-        print("ZED Camera initialized")
+        rospy.loginfo("ZED Camera Initialized!")
 
     def _image_and_depth_map(self):
+        if self.DEBUG:
+            rospy.logdebug("Getting image and depth map...")
+
         if self.zed.grab(self.runtime_params) == sl.ERROR_CODE.SUCCESS:
             self.zed.retrieve_image(self.img_left, sl.VIEW.LEFT)
             self.img_left = self.img_left.get_data()
@@ -67,19 +71,20 @@ class droneVision:
             self.zed.retrieve_measure(self.depth_map, sl.MEASURE.DEPTH)
             self.depth_map = self.depth_map.get_data()
         else:
-            print("Error grabbing image")
+            rospy.logfatal("No image! Exiting program...")
             exit(1)
 
     def _get_detections(self):
+        if self.DEBUG:
+            rospy.logdebug("Getting detections...")
         return self.model.predict(source=self.img_left, conf=0.5, show=self.DEBUG_CAM) 
     
     def detection_results(self):
-        if self.DEBUG:
-            print("Getting detection results...")
-            print("")
-    
         self._image_and_depth_map()
         results = self._get_detections()
+
+        if self.DEBUG:
+            rospy.logdebug("Getting detection results...")
 
         self.color_list = []
         self.depth_list = []
@@ -97,13 +102,13 @@ class droneVision:
                 self.color_list.append(self.model.names[int(d_cls)])
 
         if self.DEBUG:
-            print("Results prosseced!")
-            print("")
+            rospy.logdebug("Results prosessed!")
+            time.sleep(1)
     
     def get_closest_buoy(self):
         if self.DEBUG:
-            print("Getting closest buoy...")
-            print("")
+            rospy.logdebug("Getting closest buoy...")
+            time.sleep(1)
 
         self.closest_color = None
         self.closest_dist = None
@@ -117,15 +122,15 @@ class droneVision:
             self.closest_color = self.color_list[closest_index]
             self.closest_bearing = self.bearing_list[closest_index]
             self.closest_is_none = False
+            rospy.loginfo("Distance to " + self.closest_color + ": " + str(self.closest_dist) + "m ", "at bearing: " + str(self.closest_bearing) + " degres.")
         except IndexError:
-            print("No buoys detected!")
-            print("")
+            rospy.logwarn("No buoys detected!")
             pass
     
     def get_2nd_closest_buoy(self):
         if self.DEBUG:
-            print("Getting second closest buoy...")
-            print("")
+            rospy.logdebug("Getting second closest buoy...")
+            time.sleep(1)
 
         self.second_closest_color = None
         self.second_closest_dist = None
@@ -139,24 +144,30 @@ class droneVision:
             self.second_closest_color = self.color_list[second_closest_index]
             self.second_closest_bearing = self.bearing_list[second_closest_index]
             self.second_is_none = False
+            rospy.loginfo("Distance to " + self.second_closest_color + ": " + str(self.second_closest_dist) + "m ", "at bearing: " + str(self.second_closest_bearing) + " degres.")
         except IndexError:
-            print("Only one buoy detected!")
-            print("")
+            if self.closest_color == "yellow_buoy":
+                rospy.loginfo("Only yellow buoy detected.")
+            else: 
+                rospy.logwarn("Only one buoy detected!")
             pass
     
     def check_buoy_gate(self):
-        if self.DEBUG:
-            print("Buoys detected: ", self.closest_color, "and ", self.second_closest_color)
-            print("")
-
         if self.closest_color == 'green_buoy' and self.second_closest_color == 'red_buoy':
+            if self.DEBUG:
+                rospy.logdebug("Green buoy is closest and red buoy is second closest.")
+                time.sleep(1)
             return True
         elif self.closest_color == 'red_buoy' and self.second_closest_color == 'green_buoy':
+            if self.DEBUG:
+                rospy.logdebug("Red buoy is closest and green buoy is second closest.")
+                time.sleep(1)
             return True
         else:
+            rospy.logwarn("No buoy gate detected!")
             return False # If false look for yellow buoy, -> get yellow buoy GPS loc from own function
         
-    def buoy_GPS_loc(self, drone_lat, drone_lon, drone_heading, R=6371e3):        
+    def buoy_GPS_loc(self, drone_lat, drone_lon, drone_heading, R=6371e3):
         self.closest_GPS = []
         self.second_closest_GPS = []
 
@@ -174,15 +185,27 @@ class droneVision:
                 second_closest_buoy_lat = round(np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad)), self.GPS_round)
                 second_closest_buoy_lon = round(drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat)), self.GPS_round)
                 self.second_closest_GPS.append((np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon)))
+            elif self.closest_color == 'yellow_buoy':
+                rospy.loginfo("Yellow buoy detected.")
             else:
-                print("Only one buoy detected!")
-        
+                rospy.logwwarn("Only one buoy detected!")
+
         else:
-            print("No buoys detected!")
+            rospy.logwwarn("No buoys detected!")
+
+        if self.DEBUG:
+            rospy.logdebug("Closest buoy GPS: " + str(self.closest_GPS))
+            rospy.logdebug("Second closest buoy GPS: " + str(self.second_closest_GPS))
+            time.sleep(1)
 
     def set_waypoint(self):
         self.wp_lat = (self.closest_GPS[0] + self.second_closest_GPS[0]) / 2
         self.wp_lon = (self.closest_GPS[1] + self.second_closest_GPS[1]) / 2
+
+        if self.DEBUG:
+            rospy.logdebug("Waypoint GPS: " + str(self.wp_lat) + ", " + str(self.wp_lon))
+            time.sleep(1)
+
         return self.wp_lat, self.wp_lon
 
 
@@ -207,14 +230,31 @@ class droneData:
     def gps_callback(self, msg):
         self.lat = msg.latitude
         self.lon = msg.longitude
+
+        if self.DEBUG:
+            rospy.logdebug("Drone GPS location: " + str(self.lat) + ", " + str(self.lon))
+            time.sleep(1)
     
     def heading_callback(self, msg):
         self.heading = msg.data
+
+        if self.DEBUG:
+            rospy.logdebug("Drone heading: " + str(self.heading))
+            time.sleep(1)
 
     def vel_callback(self, msg):
         self.lin_vel_x = msg.twist.linear.x
         self.lin_vel_y = msg.twist.linear.y
         self.ang_vel_z = msg.twist.angular.z
 
+        if self.DEBUG:
+            rospy.logdebug("Drone linear velocity " + "forward: " + str(self.lin_vel_x) + ", " + "sideways: " + str(self.lin_vel_y))
+            rospy.logdebug("Drone angular velocity: " + str(self.ang_vel_z))
+            time.sleep(1)
+
     def wp_reached_callback(self, msg):
         self.wp_reached = msg.wp_seq
+
+        if self.DEBUG:
+            rospy.logdebug("Waypoint reached: " + str(self.wp_reached))
+            time.sleep(1)
