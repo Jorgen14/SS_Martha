@@ -46,6 +46,9 @@ class droneVision:
         positional_tracking_parameters = sl.PositionalTrackingParameters()
         self.zed.enable_positional_tracking(positional_tracking_parameters)
 
+        print("Exposure: ", self.zed.get_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE))
+        #self.zed.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, 100)
+
         self.width = self.zed.get_camera_information().camera_resolution.width
         self.height = self.zed.get_camera_information().camera_resolution.height
         self.hfov = self.zed.get_camera_information().camera_configuration.calibration_parameters.left_cam.h_fov
@@ -153,19 +156,29 @@ class droneVision:
             pass
     
     def check_buoy_gate(self):
+        self.gate_found = False
+        self.prev_gate_found = False
+
         if self.closest_color == 'green_buoy' and self.second_closest_color == 'red_buoy':
-            if self.DEBUG:
-                rospy.logdebug("Green buoy is closest and red buoy is second closest.")
-                time.sleep(1)
-            return True
+            if (self.closest_bearing - self.second_closest_bearing) < 0:
+                if self.DEBUG:
+                    rospy.logdebug("Green buoy is closest and red buoy is second closest.")
+                    rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
+                    time.sleep(1)
+                self.gate_found = True
+            else:
+                self.prev_gate_found = True
         elif self.closest_color == 'red_buoy' and self.second_closest_color == 'green_buoy':
-            if self.DEBUG:
-                rospy.logdebug("Red buoy is closest and green buoy is second closest.")
-                time.sleep(1)
-            return True
+            if (self.closest_bearing - self.second_closest_bearing) > 0:
+                if self.DEBUG:
+                    rospy.logdebug("Red buoy is closest and green buoy is second closest.")
+                    rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
+                    time.sleep(1)
+                self.gate_found = True
+            else:
+                self.prev_gate_found = True
         else:
             rospy.logwarn("No buoy gate detected!")
-            return False # If false look for yellow buoy, -> get yellow buoy GPS loc from own function
         
     def buoy_GPS_loc(self, drone_lat, drone_lon, drone_heading, R=6371e3):
         self.closest_GPS = []

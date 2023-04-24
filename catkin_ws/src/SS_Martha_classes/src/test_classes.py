@@ -22,8 +22,11 @@ while not rospy.is_shutdown():
             MarthaVision.get_closest_buoy() 
             MarthaVision.get_2nd_closest_buoy()
             MarthaVision.buoy_GPS_loc(MarthaData.lat, MarthaData.lon, MarthaData.heading)
-            if MarthaVision.check_buoy_gate():
+            MarthaVision.check_buoy_gate()
+            if MarthaVision.gate_found:
                 MarthaVision.set_waypoint()
+            elif MarthaVision.prev_gate_found:
+                rospy.loginfo("Previous gate found, turn 180 degrees and look again!")
             else:
                 rospy.logerr("Gate not found!")
         
