@@ -18,16 +18,16 @@ class droneVision:
 
         self.zed = sl.Camera()
         init_params = sl.InitParameters()
-        init_params.camera_resolution = sl.RESOLUTION.HD1080 # Options: HD2K, HD1080, HD720, VGA
+        init_params.camera_resolution = sl.RESOLUTION.HD2K # Options: HD2K, HD1080, HD720, VGA
         init_params.depth_mode = sl.DEPTH_MODE.PERFORMANCE
         init_params.coordinate_units = sl.UNIT.METER
         init_params.sdk_verbose = True
 
-        print("Exposure: ", self.zed.get_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE))
-        #self.zed.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, 100)
-
         self.runtime_params = sl.RuntimeParameters()
         self.zed_status = self.zed.open(init_params)
+        
+        self.zed.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, -1) # -1 = auto
+        rospy.loginfo("Exposure: " + str(self.zed.get_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE)))
 
         if self.zed_status != sl.ERROR_CODE.SUCCESS:
             print (repr(self.zed_status))
@@ -59,7 +59,7 @@ class droneVision:
         self.img_left = sl.Mat()
         self.depth_map = sl.Mat()
 
-        self.model = YOLO('/home/navo/GitHub/SS_Martha/catkin_ws/src/SS_Martha_classes/src/buoy_detect.pt') 
+        self.model = YOLO('/home/navo/GitHub/SS_Martha/YOLOv8/buoy_s.pt') 
 
         rospy.loginfo("ZED Camera Initialized!")
 
@@ -69,10 +69,10 @@ class droneVision:
 
         if self.zed.grab(self.runtime_params) == sl.ERROR_CODE.SUCCESS:
             self.zed.retrieve_image(self.img_left, sl.VIEW.LEFT)
-            self.img_left = self.img_left.get_data()
-            self.img_left = self.img_left[:,:,:3] # Remove alpha channel
+            self.np_img_left = self.img_left.get_data()
+            self.np_img_left = self.np_img_left[:,:,:3] # Remove alpha channel
             self.zed.retrieve_measure(self.depth_map, sl.MEASURE.DEPTH)
-            self.depth_map = self.depth_map.get_data()
+            self.depth_img = self.depth_map.get_data()
         else:
             rospy.logfatal("No image! Exiting program...")
             exit(1)
@@ -80,7 +80,7 @@ class droneVision:
     def _get_detections(self):
         if self.DEBUG:
             rospy.logdebug("Getting detections...")
-        return self.model.predict(source=self.img_left, conf=0.5, show=self.DEBUG_CAM) 
+        return self.model.predict(source=self.np_img_left, conf=0.5, show=self.DEBUG_CAM) 
     
     def detection_results(self):
         self._image_and_depth_map()
@@ -97,7 +97,7 @@ class droneVision:
             for box in result.boxes.xyxy:
                 center = ((box[2].item() - box[0].item()) / 2 + box[0].item(), 
                           (box[3].item() - box[1].item()) / 2 + box[1].item())
-                self.depth_list.append(self.depth_map[int(center[1])][int(center[0])])
+                self.depth_list.append(self.depth_img[int(center[1])][int(center[0])])
                 Tx = int(center[0]) - self.cx
                 theta = Tx * self.lamda_x
                 self.bearing_list.append(theta)
@@ -125,7 +125,7 @@ class droneVision:
             self.closest_color = self.color_list[closest_index]
             self.closest_bearing = self.bearing_list[closest_index]
             self.closest_is_none = False
-            rospy.loginfo("Distance to " + self.closest_color + ": " + str(self.closest_dist) + "m ", "at bearing: " + str(self.closest_bearing) + " degres.")
+            rospy.loginfo("Distance to " + self.closest_color + ": " + str(self.closest_dist) + "m " + "at bearing: " + str(self.closest_bearing) + " degrees.")
         except IndexError:
             rospy.logwarn("No buoys detected!")
             pass
@@ -147,7 +147,7 @@ class droneVision:
             self.second_closest_color = self.color_list[second_closest_index]
             self.second_closest_bearing = self.bearing_list[second_closest_index]
             self.second_is_none = False
-            rospy.loginfo("Distance to " + self.second_closest_color + ": " + str(self.second_closest_dist) + "m ", "at bearing: " + str(self.second_closest_bearing) + " degres.")
+            rospy.loginfo("Distance to " + self.second_closest_color + ": " + str(self.second_closest_dist) + "m " + "at bearing: " + str(self.second_closest_bearing) + " degrees.")
         except IndexError:
             if self.closest_color == "yellow_buoy":
                 rospy.loginfo("Only yellow buoy detected.")
@@ -191,20 +191,22 @@ class droneVision:
             closest_bearing_rad = np.radians(drone_heading + self.closest_bearing) # With respect to North
             closest_buoy_lat = round(np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad)), self.GPS_round)
             closest_buoy_lon = round(drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat)), self.GPS_round)
-            self.closest_GPS.append((np.degrees(closest_buoy_lat), np.degrees(closest_buoy_lon)))
+            self.closest_GPS.append(np.degrees(closest_buoy_lat))
+            self.closest_GPS.append(np.degrees(closest_buoy_lon)) 
 
             if not self.second_is_none and not self.closest_color == 'yellow_buoy':
                 second_closest_bearing_rad = np.radians(drone_heading + self.second_closest_bearing) # With respect to North
                 second_closest_buoy_lat = round(np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad)), self.GPS_round)
                 second_closest_buoy_lon = round(drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat)), self.GPS_round)
-                self.second_closest_GPS.append((np.degrees(second_closest_buoy_lat), np.degrees(second_closest_buoy_lon)))
+                self.second_closest_GPS.append(np.degrees(second_closest_buoy_lat))
+                self.second_closest_GPS.append(np.degrees(second_closest_buoy_lon)) 
             elif self.closest_color == 'yellow_buoy':
                 rospy.loginfo("Yellow buoy detected.")
             else:
-                rospy.logwwarn("Only one buoy detected!")
+                rospy.logwarn("Only one buoy detected!")
 
         else:
-            rospy.logwwarn("No buoys detected!")
+            rospy.logwarn("No buoys detected!")
 
         if self.DEBUG:
             rospy.logdebug("Closest buoy GPS: " + str(self.closest_GPS))
@@ -212,12 +214,11 @@ class droneVision:
             time.sleep(1)
 
     def set_waypoint(self):
-        self.wp_lat = (self.closest_GPS[0] + self.second_closest_GPS[0]) / 2
-        self.wp_lon = (self.closest_GPS[1] + self.second_closest_GPS[1]) / 2
+        self.wp_lat = round((self.closest_GPS[0] + self.second_closest_GPS[0]) / 2, self.GPS_round)
+        self.wp_lon = round((self.closest_GPS[1] + self.second_closest_GPS[1]) / 2, self.GPS_round)
 
-        if self.DEBUG:
-            rospy.logdebug("Waypoint GPS: " + str(self.wp_lat) + ", " + str(self.wp_lon))
-            time.sleep(1)
+        
+        rospy.loginfo("Waypoint set at: " + "(" +  str(self.wp_lat) + ", " + str(self.wp_lon) + ")")
 
         return self.wp_lat, self.wp_lon
 

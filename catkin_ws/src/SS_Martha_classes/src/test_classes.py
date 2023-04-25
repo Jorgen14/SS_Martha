@@ -4,15 +4,20 @@ import cv2 as cv
 from martha_classes import droneVision, droneData
 from datetime import datetime
 
-rospy.init_node("TestNode")
-
 TEST_VISION = True
-rate = rospy.Rate(1)
+ROS_DEBUG = False
 
+if ROS_DEBUG:
+    rospy.init_node("TestNode", log_level=rospy.DEBUG)
+else:
+    rospy.init_node("TestNode")                                                 
+    
 if TEST_VISION:
-    MarthaVision = droneVision(DEBUG=True)
+    MarthaVision = droneVision(DEBUG=ROS_DEBUG, DEBUG_CAM=False)
 
-MarthaData = droneData(DEBUG=True)
+MarthaData = droneData(DEBUG=False)
+
+rate = rospy.Rate(1)
 
 while not rospy.is_shutdown():
     startTime = datetime.now()
@@ -32,8 +37,9 @@ while not rospy.is_shutdown():
         
         else: # TEST_DATA
             pass
-        
-        rospy.loginfo("Script time: ", datetime.now() - startTime)
+       
+        scriptTime = datetime.now() - startTime
+        rospy.loginfo("Script time: " + str(scriptTime))
         rate.sleep()
 
     except rospy.ROSInterruptException:
