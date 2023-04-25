@@ -33,7 +33,7 @@ while not rospy.is_shutdown():
         else: # TEST_DATA
             pass
         
-        print("Script time: ", datetime.now() - startTime)
+        rospy.loginfo("Script time: ", datetime.now() - startTime)
         rate.sleep()
 
     except rospy.ROSInterruptException:

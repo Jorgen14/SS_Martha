@@ -18,10 +18,13 @@ class droneVision:
 
         self.zed = sl.Camera()
         init_params = sl.InitParameters()
-        init_params.camera_resolution = sl.RESOLUTION.HD1080
+        init_params.camera_resolution = sl.RESOLUTION.HD1080 # Options: HD2K, HD1080, HD720, VGA
         init_params.depth_mode = sl.DEPTH_MODE.PERFORMANCE
         init_params.coordinate_units = sl.UNIT.METER
         init_params.sdk_verbose = True
+
+        print("Exposure: ", self.zed.get_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE))
+        #self.zed.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, 100)
 
         self.runtime_params = sl.RuntimeParameters()
         self.zed_status = self.zed.open(init_params)
@@ -45,9 +48,6 @@ class droneVision:
         
         positional_tracking_parameters = sl.PositionalTrackingParameters()
         self.zed.enable_positional_tracking(positional_tracking_parameters)
-
-        print("Exposure: ", self.zed.get_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE))
-        #self.zed.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, 100)
 
         self.width = self.zed.get_camera_information().camera_resolution.width
         self.height = self.zed.get_camera_information().camera_resolution.height
