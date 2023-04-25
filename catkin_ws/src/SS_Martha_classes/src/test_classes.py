@@ -4,8 +4,8 @@ import cv2 as cv
 from martha_classes import droneVision, droneData
 from datetime import datetime
 
-TEST_VISION = True
-ROS_DEBUG = False
+TEST_VISION = False
+ROS_DEBUG = True
 
 if ROS_DEBUG:
     rospy.init_node("TestNode", log_level=rospy.DEBUG)
@@ -13,9 +13,9 @@ else:
     rospy.init_node("TestNode")                                                 
     
 if TEST_VISION:
-    MarthaVision = droneVision(DEBUG=ROS_DEBUG, DEBUG_CAM=False)
+    MarthaVision = droneVision(DEBUG=True, DEBUG_CAM=False)
 
-MarthaData = droneData(DEBUG=False)
+MarthaData = droneData(DEBUG=True)
 
 rate = rospy.Rate(1)
 

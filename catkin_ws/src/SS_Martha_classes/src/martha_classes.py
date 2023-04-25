@@ -6,7 +6,7 @@ import rospy
 from sensor_msgs.msg import NavSatFix
 from std_msgs.msg import Float64
 from geometry_msgs.msg import TwistStamped
-from mavros_msgs.msg import WaypointReached
+from mavros_msgs.msg import WaypointReached, WaypointList
 
 class droneVision:
 
@@ -232,6 +232,7 @@ class droneData:
         self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
         self.sub_vel = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.vel_callback)
         self.sub_wp_reached = rospy.Subscriber("/mavros/mission/reached", WaypointReached, self.wp_reached_callback)
+        self.sub_wps = rospy.Subscriber("/mavros/mission/waypoints", WaypointList, self.wps_callback)
         
         self.lat = None
         self.lon = None
@@ -272,3 +273,11 @@ class droneData:
         if self.DEBUG:
             rospy.logdebug("Waypoint reached: " + str(self.wp_reached))
             time.sleep(1)
+
+    def wps_callback(self, msg):
+        self.wp_list = msg.waypoints
+
+        if self.DEBUG:
+            rospy.logdebug("Waypoint list: " + str(self.wp_list))
+            time.sleep(1)
+
