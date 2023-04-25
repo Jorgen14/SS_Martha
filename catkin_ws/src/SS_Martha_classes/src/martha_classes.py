@@ -122,8 +122,9 @@ class droneVision:
         try:
             self.closest_dist = depth_list_sorted[0]
             closest_index = self.depth_list.index(self.closest_dist)
+            self.closeset_dist = round(self.closest_dist, 2)
             self.closest_color = self.color_list[closest_index]
-            self.closest_bearing = self.bearing_list[closest_index]
+            self.closest_bearing = round(self.bearing_list[closest_index], 2)
             self.closest_is_none = False
             rospy.loginfo("Distance to " + self.closest_color + ": " + str(self.closest_dist) + "m " + "at bearing: " + str(self.closest_bearing) + " degrees.")
         except IndexError:
@@ -144,8 +145,9 @@ class droneVision:
         try:
             self.second_closest_dist = depth_list_sorted[1]
             second_closest_index = self.depth_list.index(self.second_closest_dist)
+            self.second_closest_dist = round(self.second_closest_dist, 2)
             self.second_closest_color = self.color_list[second_closest_index]
-            self.second_closest_bearing = self.bearing_list[second_closest_index]
+            self.second_closest_bearing = round(self.bearing_list[second_closest_index], 2)
             self.second_is_none = False
             rospy.loginfo("Distance to " + self.second_closest_color + ": " + str(self.second_closest_dist) + "m " + "at bearing: " + str(self.second_closest_bearing) + " degrees.")
         except IndexError:
@@ -206,7 +208,7 @@ class droneVision:
                 rospy.logwarn("Only one buoy detected!")
 
         else:
-            rospy.logwarn("No buoys detected!")
+            rospy.logerr("No buoys detected!")
 
         if self.DEBUG:
             rospy.logdebug("Closest buoy GPS: " + str(self.closest_GPS))
@@ -217,7 +219,6 @@ class droneVision:
         self.wp_lat = round((self.closest_GPS[0] + self.second_closest_GPS[0]) / 2, self.GPS_round)
         self.wp_lon = round((self.closest_GPS[1] + self.second_closest_GPS[1]) / 2, self.GPS_round)
 
-        
         rospy.loginfo("Waypoint set at: " + "(" +  str(self.wp_lat) + ", " + str(self.wp_lon) + ")")
 
         return self.wp_lat, self.wp_lon
@@ -241,6 +242,7 @@ class droneData:
         self.lin_vel_y = None
         self.ang_vel_z = None
         self.wp_reached = None
+        self.wp_list = None
 
     def gps_callback(self, msg):
         self.lat = msg.latitude

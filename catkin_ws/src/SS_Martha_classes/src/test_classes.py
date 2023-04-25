@@ -33,7 +33,7 @@ while not rospy.is_shutdown():
             elif MarthaVision.prev_gate_found:
                 rospy.loginfo("Previous gate found, turn 180 degrees and look again!")
             else:
-                rospy.logerr("Gate not found!")
+                rospy.logwarn("Gate not found!")
         
         else: # TEST_DATA
             pass
