@@ -6,7 +6,8 @@ import rospy
 from sensor_msgs.msg import NavSatFix
 from std_msgs.msg import Float64
 from geometry_msgs.msg import TwistStamped
-from mavros_msgs.msg import WaypointReached, WaypointList
+from mavros_msgs.msg import Waypoint, WaypointReached, WaypointList
+from mavros_msgs.srv import WaypointPush, WaypointClear
 
 class droneVision:
 
@@ -229,6 +230,8 @@ class droneData:
     def __init__(self, DEBUG=False):
         self.DEBUG = DEBUG
 
+        self.vision = droneVision() 
+
         self.sub_GPS = rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.gps_callback)
         self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
         self.sub_vel = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.vel_callback)
@@ -243,6 +246,10 @@ class droneData:
         self.ang_vel_z = None
         self.wp_reached = None
         self.wp_list = None
+        self.wp_set = False
+        self.check = None
+
+        self.rate = rospy.Rate(10)
 
     def gps_callback(self, msg):
         self.lat = msg.latitude
@@ -283,3 +290,41 @@ class droneData:
             rospy.logdebug("Waypoint list: " + str(self.wp_list))
             time.sleep(1)
 
+    def send_waypoint(self):
+        self.wl = [] # Waypoint list
+
+        wp = Waypoint()   #Creates new instance of WayPoint
+        wp.frame = 0 # Global frame
+        wp.command = 16  # Takeoff command
+        wp.is_current = True
+        wp.autocontinue = True
+        wp.param1 = 0  # HOLD time at WP
+        wp.param2 = 0  # Acceptance radius, if inside WP count as reached
+        wp.param3 = 0  # Pass Radius. If 0 go through WP
+        wp.param4 = 0 # float('nan')  # Yaw, 0 for our USV situation
+        wp.x_lat = self.vision.wp_lat # Latitude
+        wp.y_long = self.vision.wp_lon # Longitude
+        wp.z_alt = 0
+        self.wl.append(wp)
+
+        rospy.wait_for_service('mavros/mission/push')
+        try:
+            serviceReq = rospy.ServiceProxy('mavros/mission/push', WaypointPush)
+            serviceRes = serviceReq(start_index=0, waypoints=self.wl)
+            flag = serviceRes.success
+            if flag:
+                self.wp_set = True
+                print('SUCCESS: PUSHING WP \n')
+            else:
+                print('FAILURE: PUSHING WP \n')		
+        except rospy.ServiceException as e:
+            rospy.loginfo("Failed to send WayPoint failed: %s\n" %e)
+
+    def clear_waypoints(self):
+        rospy.wait_for_service('mavros/mission/clear')
+        try:
+            response = rospy.ServiceProxy('mavros/mission/clear', WaypointClear)		
+            return response.call().success
+        except rospy.ServiceException as e:
+            print("Service call failed: %s"%e)
+            return False

@@ -17,6 +17,8 @@ if TEST_VISION:
 
 MarthaData = droneData(DEBUG=True)
 
+MarthaData.clear_waypoints()
+
 rate = rospy.Rate(1)
 
 while not rospy.is_shutdown():
@@ -28,12 +30,16 @@ while not rospy.is_shutdown():
             MarthaVision.get_2nd_closest_buoy()
             MarthaVision.buoy_GPS_loc(MarthaData.lat, MarthaData.lon, MarthaData.heading)
             MarthaVision.check_buoy_gate()
-            if MarthaVision.gate_found:
+            if MarthaVision.gate_found and not MarthaData.wp_set:
                 MarthaVision.set_waypoint()
+                MarthaData.send_waypoint()
             elif MarthaVision.prev_gate_found:
                 rospy.loginfo("Previous gate found, turn 180 degrees and look again!")
             else:
-                rospy.logwarn("Gate not found!")
+                if MarthaData.wp_set:
+                    rospy.loginfo("Waypoint already set!")
+                else:
+                    rospy.logwarn("Gate not found!")
         
         else: # TEST_DATA
             pass
