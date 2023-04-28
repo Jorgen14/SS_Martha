@@ -12,9 +12,9 @@ class droneVision:
 
     GPS_round = 6
     rel_dist_thresh = 3.0 # Maximum relative distance between buoys
+    out_dist = 0.5 # meters to get clear of buoy gate
 
-    def __init__(self, DEBUG=False, DEBUG_CAM=False):
-        self.DEBUG = DEBUG
+    def __init__(self, DEBUG_CAM=False):
         self.DEBUG_CAM = DEBUG_CAM
 
         self.zed = sl.Camera()
@@ -243,8 +243,6 @@ class droneVision:
         self.wp_lat = round((self.closest_GPS[0] + self.second_closest_GPS[0]) / 2, self.GPS_round)
         self.wp_lon = round((self.closest_GPS[1] + self.second_closest_GPS[1]) / 2, self.GPS_round)
 
-        rospy.loginfo("Waypoint set at: " + "(" +  str(self.wp_lat) + ", " + str(self.wp_lon) + ")")
-
         closest_rad_lat = np.radians(self.closest_GPS[0])
         closest_rad_lon = np.radians(self.closest_GPS[1])
         second_rad_lat = np.radians(self.second_closest_GPS[0])
@@ -254,37 +252,31 @@ class droneVision:
         y = np.cos(closest_rad_lat) * np.sin(second_rad_lat) - np.sin(closest_rad_lat) * np.cos(second_rad_lat) * np.cos(second_rad_lon - closest_rad_lon)
         buoys_bearing = np.arctan2(x, y)
 
-        if buoys_bearing < 0:
-            buoys_bearing += 360
+        if buoys_bearing > 0 and buoys_bearing < 90:
+            if self.communication.heading > 180:
+                out_heading = np.degrees(buoys_bearing) - 90
+            else:
+                out_heading = np.degrees(buoys_bearing) + 90
+        elif buoys_bearing > 90 and buoys_bearing < 180:
+            if self.communication.heading > 180:
+                out_heading = np.degrees(buoys_bearing) + 90
+            else:
+                out_heading = np.degrees(buoys_bearing) - 90
+        elif buoys_bearing < 0 and buoys_bearing > -90:
+            if self.communication.heading > 180:
+                out_heading = np.degrees(buoys_bearing) - 90
+            else:
+                out_heading = np.degrees(buoys_bearing) + 90
+        elif buoys_bearing < -90 and buoys_bearing > -180:
+            if self.communication.heading > 180:
+                out_heading = np.degrees(buoys_bearing) + 90
+            else:
+                out_heading = np.degrees(buoys_bearing) - 90
 
-        if self.communication.heading > 180:
-            out_heading = np.degrees(buoys_bearing) + 90
-            if out_heading > 360:
-                out_heading -= 360
-        else:
-            out_heading = np.degrees(buoys_bearing) - 90
-            if out_heading < 0:
-                out_heading += 360
+        self.wp_lat_out, self.wp_lon_out = self.dist_to_GPS_cords(self.out_dist, out_heading, self.wp_lat, self.wp_lon)
 
-        # if buoys_bearing > 0 and buoys_bearing < 90:
-        #     if self.communication.heading > 180:
-        #         out_heading = np.degrees(buoys_bearing) + 90
-        #     else:
-        #         out_heading = np.degrees(buoys_bearing) - 90
-        # elif buoys_bearing > 90 and buoys_bearing < 180:
-        #     if self.communication.heading > 180:
-        #         out_heading = np.degrees(buoys_bearing) - 90
-        #     else:
-        #         out_heading = np.degrees(buoys_bearing) + 90
-        # elif buoys_bearing < 0 and buoys_bearing > -90:
-        #     if self.communication.heading > 180:
-        #         out_heading = np.degrees(buoys_bearing) + 90
-        #     else:
-        #         out_heading = np.degrees(buoys_bearing) - 90
-
-        out_dist = 1.0 # meters
-
-        self.wp_lat_out, self.wp_lon_out = self.dist_to_GPS_cords(out_dist, out_heading, self.wp_lat, self.wp_lon)
+        rospy.loginfo("Waypoint set at: " + "(" +  str(self.wp_lat) + ", " + str(self.wp_lon) + ")")
+        rospy.loginfo("Continuing " + str(self.out_dist) + "m to get clear of gate, to waypoint: " + "(" +  str(self.wp_lat_out) + ", " + str(self.wp_lon_out) + ")")
     
     # def obstacle_channel_yellow(self, position, bearing):
 
@@ -298,7 +290,8 @@ class droneVision:
             rospy.loginfo("Gate detected.")
             self.buoy_GPS_loc()
             self.obstacle_channel_gate()
-            self.communication.send_waypoint()
+            self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True)
+            self.communication.send_waypoint(self.wp_lat_out, self.wp_lon_out, curr=False)
 
         elif self.closest_color == "yellow_buoy" and self.second_is_none:
                 rospy.loginfo("Yellow buoy detected, navigating around.")
@@ -327,8 +320,7 @@ class droneVision:
 
 
 class apCommunication: # Communication with the autopilot
-    def __init__(self, DEBUG=False):
-        self.DEBUG = DEBUG
+    def __init__(self):
 
         self.vision = droneVision() 
 
@@ -355,25 +347,21 @@ class apCommunication: # Communication with the autopilot
     def gps_callback(self, msg):
         self.lat = msg.latitude
         self.lon = msg.longitude
-
         rospy.logdebug("Drone GPS location: " + str(self.lat) + ", " + str(self.lon))
     
     def heading_callback(self, msg):
         self.heading = msg.data
-
         rospy.logdebug("Drone heading: " + str(self.heading))
 
     def vel_callback(self, msg):
         self.lin_vel_x = msg.twist.linear.x
         self.lin_vel_y = msg.twist.linear.y
         self.ang_vel_z = msg.twist.angular.z
-
         rospy.logdebug("Drone linear velocity " + "forward: " + str(self.lin_vel_x) + ", " + "sideways: " + str(self.lin_vel_y))
         rospy.logdebug("Drone angular velocity: " + str(self.ang_vel_z))
 
     def wp_reached_callback(self, msg):
         self.wp_reached = msg.wp_seq
-
         rospy.logdebug("Waypoint reached: " + str(self.wp_reached))
 
     # def wps_callback(self, msg):
@@ -381,18 +369,18 @@ class apCommunication: # Communication with the autopilot
 
     #     rospy.logdebug("Waypoint list: " + str(self.wp_list))
 
-    def send_waypoint(self):
+    def send_waypoint(self, lat, lon, cmd=16, curr=False, autCont=True):
         wp = Waypoint()
         wp.frame = 0 # Global frame
-        wp.command = 16  # Takeoff command
-        wp.is_current = True
-        wp.autocontinue = True
+        wp.command = cmd  # Nav command
+        wp.is_current = curr
+        wp.autocontinue = autCont
         wp.param1 = 0  # HOLD time at WP
         wp.param2 = 0  # Acceptance radius, if inside WP count as reached
         wp.param3 = 0  # Pass Radius. If 0 go through WP
         wp.param4 = 0 # float('nan')  # Yaw, 0 for our USV situation
-        wp.x_lat = self.vision.wp_lat # Latitude
-        wp.y_long = self.vision.wp_lon # Longitude
+        wp.x_lat = lat # Latitude
+        wp.y_long = lon # Longitude
         wp.z_alt = 0
         self.wl.append(wp)
 

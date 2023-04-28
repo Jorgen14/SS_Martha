@@ -13,9 +13,9 @@ else:
     rospy.init_node("TestNode")                                                 
     
 if TEST_VISION:
-    MarthaVision = droneVision(DEBUG=False, DEBUG_CAM=False)
+    MarthaVision = droneVision(DEBUG_CAM=False)
 
-MarthaData = droneData(DEBUG=False)
+MarthaData = droneData()
 
 MarthaData.clear_waypoints()
 
