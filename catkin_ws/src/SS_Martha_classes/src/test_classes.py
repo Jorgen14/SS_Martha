@@ -28,7 +28,7 @@ while not rospy.is_shutdown():
             MarthaVision.detection_results()
             MarthaVision.get_closest_buoy() 
             MarthaVision.get_2nd_closest_buoy()
-            MarthaVision.buoy_GPS_loc(MarthaData.lat, MarthaData.lon, MarthaData.heading)
+            MarthaVision.buoy_GPS_loc()
             MarthaVision.check_buoy_gate()
             if MarthaVision.gate_found and not MarthaData.wp_set:
                 MarthaVision.set_waypoint()
