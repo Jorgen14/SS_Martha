@@ -4,8 +4,8 @@ import cv2 as cv
 from martha_classes import droneVision, droneData
 from datetime import datetime
 
-TEST_VISION = False
-ROS_DEBUG = True
+TEST_VISION = True
+ROS_DEBUG = False
 
 if ROS_DEBUG:
     rospy.init_node("TestNode", log_level=rospy.DEBUG)
@@ -13,9 +13,9 @@ else:
     rospy.init_node("TestNode")                                                 
     
 if TEST_VISION:
-    MarthaVision = droneVision(DEBUG=True, DEBUG_CAM=False)
+    MarthaVision = droneVision(DEBUG=False, DEBUG_CAM=False)
 
-MarthaData = droneData(DEBUG=True)
+MarthaData = droneData(DEBUG=False)
 
 MarthaData.clear_waypoints()
 
