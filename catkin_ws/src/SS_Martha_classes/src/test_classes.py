@@ -1,6 +1,5 @@
 #!/usr/bin/env python3.8
 import rospy
-import cv2 as cv
 from martha_classes import droneVision, droneData
 from datetime import datetime
 
@@ -19,7 +18,7 @@ MarthaData = droneData()
 
 MarthaData.clear_waypoints()
 
-rate = rospy.Rate(1)
+rate = rospy.Rate(10)
 
 while not rospy.is_shutdown():
     startTime = datetime.now()
