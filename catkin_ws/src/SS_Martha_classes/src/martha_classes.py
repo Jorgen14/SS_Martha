@@ -4,7 +4,7 @@ from ultralytics import YOLO
 import rospy
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from std_msgs.msg import Float64
-from geometry_msgs.msg import TwistStamped
+from geometry_msgs.msg import Twist, TwistStamped
 from mavros_msgs.msg import Waypoint, WaypointReached, WaypointList
 from mavros_msgs.srv import WaypointPush, WaypointClear
 from cv_bridge import CvBridge, CvBridgeError
@@ -27,6 +27,8 @@ class droneVision:
         self.sub_img = rospy.Subscriber("/zed2/zed_node/left/rgb/image_rect_color", Image, self.image_callback)
         self.sub_depth = rospy.Subscriber("/zed2/zed_node/depth/depth_registered", Image, self.depth_callback)
         self.sub_cam_info = rospy.Subscriber("/zed2/zed_node/left/camera_info", CameraInfo, self.cam_info_callback)
+
+        #self.rate = rospy.Rate(10)
 
         rospy.loginfo("Initialized!")
 
@@ -57,6 +59,10 @@ class droneVision:
         hfov = np.degrees(2 * np.arctan(width / (2 * fx)))
         self.lamda_x = hfov / width
         self.cx = msg.K[0][2]
+        rospy.logdebug("Camera info received:")
+        rospy.logdebug("width: " + str(width))
+        rospy.logdebug("hfov: " + str(hfov))
+        rospy.logdebug("cx: " + str(self.cx))
 
     def get_detections(self):
         rospy.logdebug("Getting detections...")
@@ -220,26 +226,18 @@ class droneVision:
     
     @staticmethod
     def wp_rel_to_bearing(_bearing, rel_angle, drone_hdg):
-        if _bearing > 0 and _bearing < 90:
-            if drone_hdg > 180:
-                out_heading = np.degrees(_bearing) - rel_angle
+        out_heading = None
+        if (_bearing > 0 and _bearing < 90) or (_bearing < 0 and _bearing > -90):
+            if (drone_hdg >= 270 and drone_hdg < 360) or (drone_hdg >= 0 and drone_hdg < 90):
+                out_heading = _bearing - rel_angle
             else:
-                out_heading = np.degrees(_bearing) + rel_angle
-        elif _bearing > 90 and _bearing < 180:
-            if drone_hdg > 180:
-                out_heading = np.degrees(_bearing) + rel_angle
+                out_heading = _bearing + rel_angle
+        elif (_bearing > 90 and _bearing < 180) or (_bearing < -90 and _bearing > -180):
+            if drone_hdg >= 90 and drone_hdg < 270:
+                out_heading = _bearing + rel_angle
             else:
-                out_heading = np.degrees(_bearing) - rel_angle
-        elif _bearing < 0 and _bearing > -90:
-            if drone_hdg > 180:
-                out_heading = np.degrees(_bearing) - rel_angle
-            else:
-                out_heading = np.degrees(_bearing) + rel_angle
-        elif _bearing < -90 and _bearing > -180:
-            if drone_hdg > 180:
-                out_heading = np.degrees(_bearing) + rel_angle
-            else:
-                out_heading = np.degrees(_bearing) - rel_angle
+                out_heading = _bearing - rel_angle
+
         return out_heading
 
     def obstacle_channel_gate(self):
@@ -309,11 +307,8 @@ class droneVision:
 
         else:
             rospy.loginfo("No detections, moving " + str(self.no_buoy_dist) + "m forward to check again.")
-            self.wp_lon, self.wp_lat = self.dist_to_GPS_cords(self.no_buoy_dist , 0, self.communication.lat, self.communication.lon) 
-
-        # Timer start
-
-    # def nav_channel_transit(self):
+            self.wp_lon, self.wp_lat = self.dist_to_GPS_cords(self.no_buoy_dist, 0, self.communication.lat, self.communication.lon) 
+            self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True)
 
 
 
@@ -321,6 +316,9 @@ class apCommunication: # Communication with the autopilot
     def __init__(self):
 
         self.vision = droneVision() 
+
+        self.pub_vel = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=10)
+        self.cmd_vel = Twist()
 
         self.sub_GPS = rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.gps_callback)
         self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
@@ -339,7 +337,7 @@ class apCommunication: # Communication with the autopilot
         self.wp_set = False
         self.check = None
 
-        self.rate = rospy.Rate(10)
+        #self.rate = rospy.Rate(10)
 
     def gps_callback(self, msg):
         self.lat = msg.latitude
@@ -370,7 +368,7 @@ class apCommunication: # Communication with the autopilot
         self.wl = []
         wp = Waypoint()
         wp.frame = 0 # Global frame
-        wp.command = cmd  # Nav command
+        wp.command = cmd  # 16 = Nav command, 
         wp.is_current = curr
         wp.autocontinue = autCont
         wp.param1 = 0  # HOLD time at WP
@@ -389,11 +387,11 @@ class apCommunication: # Communication with the autopilot
             flag = serviceRes.success
             if flag:
                 self.wp_set = True
-                print("Waypoint successfully pushed")
+                rospy.logdebug("Waypoint successfully pushed")
             else:
-                print('FAILURE: PUSHING WP \n')		
+                rospy.logerr("FAILURE: PUSHING WP!")		
         except rospy.ServiceException as e:
-            rospy.loginfo("Failed to send WayPoint failed: %s\n" %e)
+            rospy.logerr("Failed to send WayPoint: %s\n" %e)
 
     def clear_waypoints(self):
         rospy.wait_for_service('mavros/mission/clear')
@@ -401,5 +399,41 @@ class apCommunication: # Communication with the autopilot
             response = rospy.ServiceProxy('mavros/mission/clear', WaypointClear)		
             return response.call().success
         except rospy.ServiceException as e:
-            print("Service call failed: %s"%e)
+            rospy.logerr("Clear waypoint failed: %s"%e)
             return False
+        
+    def rotate_right(self, ang_vel):
+        self.cmd_vel.linear.x = 0
+        self.cmd_vel.linear.y = 0
+        self.cmd_vel.linear.z = 0
+        self.cmd_vel.angular.x = 0
+        self.cmd_vel.angular.y = 0
+        self.cmd_vel.angular.z = ang_vel
+        self.pub_vel.publish(self.cmd_vel)
+
+    def rotate_left(self, ang_vel):
+        self.cmd_vel.linear.x = 0
+        self.cmd_vel.linear.y = 0
+        self.cmd_vel.linear.z = 0
+        self.cmd_vel.angular.x = 0
+        self.cmd_vel.angular.y = 0
+        self.cmd_vel.angular.z = -ang_vel
+        self.pub_vel.publish(self.cmd_vel)
+    
+    def move_forward(self, lin_vel):
+        self.cmd_vel.linear.x = lin_vel
+        self.cmd_vel.linear.y = 0
+        self.cmd_vel.linear.z = 0
+        self.cmd_vel.angular.x = 0
+        self.cmd_vel.angular.y = 0
+        self.cmd_vel.angular.z = 0
+        self.pub_vel.publish(self.cmd_vel)
+    
+    def stop(self):
+        self.cmd_vel.linear.x = 0
+        self.cmd_vel.linear.y = 0
+        self.cmd_vel.linear.z = 0
+        self.cmd_vel.angular.x = 0
+        self.cmd_vel.angular.y = 0
+        self.cmd_vel.angular.z = 0
+        self.pub_vel.publish(self.cmd_vel)
