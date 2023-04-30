@@ -11,7 +11,7 @@ if ROS_DEBUG:
 else:
     rospy.init_node("TestNode")  
 
-rate = rospy.Rate(10)   
+rate = rospy.Rate(1)   
 
 MarthaVision = droneVision(DEBUG_CAM=False)
 
@@ -21,15 +21,13 @@ MarthaCom.clear_waypoints()
 
 while not rospy.is_shutdown():
     startTime = datetime.now()
-    try:
-        time.sleep(0.5)
-        """
+    try:          
         if not MarthaCom.wp_set:
             MarthaVision.detection_results()
             MarthaVision.get_closest_buoy() 
             MarthaVision.get_2nd_closest_buoy()
             MarthaVision.buoy_GPS_loc()
-
+            """
             if MarthaVision.check_buoy_gate() and MarthaVision.check_gate_orientation():
                 MarthaVision.obstacle_channel_gate()
                 MarthaVision.communication.send_waypoint(MarthaVision.wp_lat, MarthaVision.wp_lon, curr=True)
@@ -74,13 +72,11 @@ while not rospy.is_shutdown():
         else:
             rospy.loginfo("Waypoints set, waiting to set next waypoint.")
             time.sleep(1)
-       
+        """
         scriptTime = datetime.now() - startTime
         rospy.loginfo("Script time: " + str(scriptTime))
         rate.sleep()
-        """
+        
     except rospy.ROSInterruptException:
         break
 
-
-MarthaVision.zed.close()

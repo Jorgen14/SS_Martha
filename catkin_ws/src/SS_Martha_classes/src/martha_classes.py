@@ -1,3 +1,4 @@
+import time
 import cv2 as cv
 import numpy as np
 from ultralytics import YOLO
@@ -20,50 +21,72 @@ class droneVision:
     def __init__(self, DEBUG_CAM=False):
         self.DEBUG_CAM = DEBUG_CAM
 
+        self.img_array = None
+        self.depth_img = None
+
         self.communication = apCommunication()
         self.model = YOLO('/home/navo/GitHub/SS_Martha/YOLOv8/buoy_s.pt') 
         self.bridge = CvBridge()
 
-        self.sub_img = rospy.Subscriber("/zed2/zed_node/left/rgb/image_rect_color", Image, self.image_callback)
+        self.sub_img = rospy.Subscriber("/zed2/zed_node/left/image_rect_color", Image, self.image_callback)
         self.sub_depth = rospy.Subscriber("/zed2/zed_node/depth/depth_registered", Image, self.depth_callback)
         self.sub_cam_info = rospy.Subscriber("/zed2/zed_node/left/camera_info", CameraInfo, self.cam_info_callback)
 
         #self.rate = rospy.Rate(10)
+        
+        try:
+            while self.img_array == None:
+                rospy.loginfo("Waiting for image...")
+                time.sleep(1)
+        except ValueError:
+            pass
+
+        try: 
+            while self.depth_img == None:
+                rospy.loginfo("Waiting for depth image...")
+                time.sleep(1)
+        except ValueError:
+            pass
 
         rospy.loginfo("Initialized!")
 
     def image_callback(self, msg):
+        """
         try:
             img_left = self.bridge.imgmsg_to_cv2(msg, "bgr8")
         except CvBridgeError as e:
             rospy.logerr(e)
 
         self.img_array = np.array(img_left)
+        """
+        img_left = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+        img_left = img_left[:,:,:3]
+        self.img_array = cv.normalize(img_left, None, 0, 255, cv.NORM_MINMAX, cv.CV_8U)
+         
         rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
 
-        cv.imshow("Image", self.img_array)
-        cv.waitKey(1)
-
     def depth_callback(self, msg):
+        depth_map = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
+        self.depth_img = cv.normalize(depth_map, None, 0, 255, cv.NORM_MINMAX, cv.CV_32FC1)
+        rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape))
+        
+        """
         try:
-            depth_img = self.bridge.imgmsg_to_cv2(msg, "passthrough")
+            depth_img = self.bridge.imgmsg_to_cv2(msg.data, "32FC1")
         except CvBridgeError as e:
             rospy.logerr(e)
 
         self.depth_array = np.array(depth_img)
         rospy.logdebug("Depth image received, shape: " + str(self.depth_array.shape))
+       """ 
 
     def cam_info_callback(self, msg):
         width = msg.width
-        fx = msg.K[0][0]
+        fx = msg.K[0]
         hfov = np.degrees(2 * np.arctan(width / (2 * fx)))
         self.lamda_x = hfov / width
-        self.cx = msg.K[0][2]
-        rospy.logdebug("Camera info received:")
-        rospy.logdebug("width: " + str(width))
-        rospy.logdebug("hfov: " + str(hfov))
-        rospy.logdebug("cx: " + str(self.cx))
-
+        self.cx = msg.K[2]
+        
     def get_detections(self):
         rospy.logdebug("Getting detections...")
         return self.model.predict(source=self.img_array, conf=0.5, show=self.DEBUG_CAM) 
@@ -81,7 +104,7 @@ class droneVision:
             for box in result.boxes.xyxy:
                 center = ((box[2].item() - box[0].item()) / 2 + box[0].item(), 
                           (box[3].item() - box[1].item()) / 2 + box[1].item())
-                self.depth_list.append(self.depth_array[int(center[1])][int(center[0])])
+                self.depth_list.append(self.depth_img[int(center[1]), int(center[0])])
                 Tx = int(center[0]) - self.cx
                 theta = Tx * self.lamda_x
                 self.bearing_list.append(theta)
@@ -314,9 +337,7 @@ class droneVision:
 
 
 class apCommunication: # Communication with the autopilot
-    def __init__(self):
-
-        self.vision = droneVision() 
+    def __init__(self): 
 
         self.pub_vel = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=10)
         self.cmd_vel = Twist()
