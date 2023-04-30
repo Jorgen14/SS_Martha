@@ -40,14 +40,14 @@ class droneVision:
                 time.sleep(1)
         except ValueError:
             pass
-
+        """
         try: 
             while self.depth_img == None:
                 rospy.loginfo("Waiting for depth image...")
                 time.sleep(1)
         except ValueError:
             pass
-
+        """
         rospy.loginfo("Initialized!")
 
     def image_callback(self, msg):
@@ -66,20 +66,22 @@ class droneVision:
         rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
 
     def depth_callback(self, msg):
-        #depth_map = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
-        #self.depth_img = cv.normalize(depth_map, None, 0, 255, cv.NORM_MINMAX, cv.CV_32FC1)
-        self.depth_img = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
+        depth_map = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
+        self.depth_img = depth_map[:,:, 0]
+        #self.depth_img = cv.normalize(depth_map, None, 0, 1, cv.NORM_MINMAX, cv.CV_32FC1)
+        #depth_map = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
+        #self.depth_img = cv.normalize(depth_map, None, 0, 255, cv.NORM_MINMAX, cv.CV_8U)  
         rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape))
         
         """
         try:
-            depth_img = self.bridge.imgmsg_to_cv2(msg.data, "32FC1")
+            depth_img = self.bridge.imgmsg_to_cv2(data, desired_encoding="passthrough")
         except CvBridgeError as e:
             rospy.logerr(e)
 
         self.depth_array = np.array(depth_img, dtype=np.float32)
         rospy.logdebug("Depth image received, shape: " + str(self.depth_array.shape))
-       """ 
+        """
 
     def cam_info_callback(self, msg):
         width = msg.width
@@ -112,7 +114,9 @@ class droneVision:
             for d_cls in result.boxes.cls:
                 self.color_list.append(self.model.names[int(d_cls)])
 
-        rospy.logdebug("Results prosessed!")
+        rospy.logdebug("Colors: " + str(self.color_list))
+        rospy.logdebug("Depths: " + str(self.depth_list))
+        rospy.logdebug("Bearings: " + str(self.bearing_list))
     
     def get_closest_buoy(self):
         rospy.logdebug("Getting closest buoy...")
@@ -126,7 +130,7 @@ class droneVision:
         try:
             self.closest_dist = depth_list_sorted[0]
             closest_index = self.depth_list.index(self.closest_dist)
-            self.closeset_dist = round(self.closest_dist, 2)
+            self.closest_dist = round(self.closest_dist, 2)
             self.closest_color = self.color_list[closest_index]
             self.closest_bearing = round(self.bearing_list[closest_index], 2)
             self.closest_is_none = False
