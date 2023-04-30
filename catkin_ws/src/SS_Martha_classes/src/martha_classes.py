@@ -221,11 +221,12 @@ class droneVision:
 
         x = np.sin(lon2_rad - lon1_rad) * np.cos(lat2_rad)
         y = np.cos(lat1_rad) * np.sin(lat2_rad) - np.sin(lat1_rad) * np.cos(lat2_rad) * np.cos(lon2_rad - lon1_rad)
-
-        return np.degrees(np.arctan2(x, y))
+        two_points_bearing = np.degrees(np.arctan2(x, y))
+        rospy.logdebug("Bearing between two GPS points: " + str(two_points_bearing))
+        return two_points_bearing
     
     @staticmethod
-    def wp_rel_to_bearing(_bearing, rel_angle, drone_hdg):
+    def hdg_rel_to_bearing(_bearing, rel_angle, drone_hdg):
         out_heading = None
         if (_bearing > 0 and _bearing < 90) or (_bearing < 0 and _bearing > -90):
             if (drone_hdg >= 270 and drone_hdg < 360) or (drone_hdg >= 0 and drone_hdg < 90):
@@ -245,7 +246,7 @@ class droneVision:
         self.wp_lon = round((self.closest_GPS[1] + self.second_closest_GPS[1]) / 2, self.GPS_round)
 
         buoys_bearing = self.two_points_bearing(self.closest_GPS[0], self.closest_GPS[1], self.second_closest_GPS[0], self.second_closest_GPS[1])
-        out_gate_heading = self.wp_rel_to_bearing(buoys_bearing, 90, self.communication.heading)
+        out_gate_heading = self.hdg_rel_to_bearing(buoys_bearing, 90, self.communication.heading)
 
         self.wp_lat_out, self.wp_lon_out = self.dist_to_GPS_cords(self.out_dist, out_gate_heading, self.wp_lat, self.wp_lon)
 
