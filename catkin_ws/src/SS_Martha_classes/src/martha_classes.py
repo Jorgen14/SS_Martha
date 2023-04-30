@@ -8,7 +8,6 @@ from std_msgs.msg import Float64
 from geometry_msgs.msg import Twist, TwistStamped
 from mavros_msgs.msg import Waypoint, WaypointReached, WaypointList
 from mavros_msgs.srv import WaypointPush, WaypointClear
-from cv_bridge import CvBridge, CvBridgeError
 
 class droneVision:
 
@@ -26,13 +25,10 @@ class droneVision:
 
         self.communication = apCommunication()
         self.model = YOLO('/home/navo/GitHub/SS_Martha/YOLOv8/buoy_s.pt') 
-        self.bridge = CvBridge()
 
         self.sub_img = rospy.Subscriber("/zed2/zed_node/left/image_rect_color", Image, self.image_callback)
         self.sub_depth = rospy.Subscriber("/zed2/zed_node/depth/depth_registered", Image, self.depth_callback)
         self.sub_cam_info = rospy.Subscriber("/zed2/zed_node/left/camera_info", CameraInfo, self.cam_info_callback)
-
-        #self.rate = rospy.Rate(10)
         
         try:
             while self.img_array == None:
@@ -40,25 +36,17 @@ class droneVision:
                 time.sleep(1)
         except ValueError:
             pass
-        """
+        
         try: 
             while self.depth_img == None:
                 rospy.loginfo("Waiting for depth image...")
                 time.sleep(1)
         except ValueError:
             pass
-        """
+        
         rospy.loginfo("Initialized!")
 
     def image_callback(self, msg):
-        """
-        try:
-            img_left = self.bridge.imgmsg_to_cv2(msg, "bgr8")
-        except CvBridgeError as e:
-            rospy.logerr(e)
-
-        self.img_array = np.array(img_left)
-        """
         img_left = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
         img_left = img_left[:,:,:3]
         self.img_array = cv.normalize(img_left, None, 0, 255, cv.NORM_MINMAX, cv.CV_8U)
@@ -67,21 +55,8 @@ class droneVision:
 
     def depth_callback(self, msg):
         depth_map = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
-        self.depth_img = depth_map[:,:, 0]
-        #self.depth_img = cv.normalize(depth_map, None, 0, 1, cv.NORM_MINMAX, cv.CV_32FC1)
-        #depth_map = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
-        #self.depth_img = cv.normalize(depth_map, None, 0, 255, cv.NORM_MINMAX, cv.CV_8U)  
+        self.depth_img = depth_map[:,:, 0] 
         rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape))
-        
-        """
-        try:
-            depth_img = self.bridge.imgmsg_to_cv2(data, desired_encoding="passthrough")
-        except CvBridgeError as e:
-            rospy.logerr(e)
-
-        self.depth_array = np.array(depth_img, dtype=np.float32)
-        rospy.logdebug("Depth image received, shape: " + str(self.depth_array.shape))
-        """
 
     def cam_info_callback(self, msg):
         width = msg.width
@@ -157,10 +132,7 @@ class droneVision:
             self.second_is_none = False
             rospy.loginfo("Distance to " + self.second_closest_color + ": " + str(self.second_closest_dist) + "m " + "at bearing: " + str(self.second_closest_bearing) + " degrees.")
         except IndexError:
-            if self.closest_color == "yellow_buoy":
-                rospy.loginfo("Only yellow buoy detected.")
-            else: 
-                rospy.logwarn("Only one buoy detected!")
+            rospy.logwarn("Second buoy not detected!")
             pass
 
     def check_buoy_gate(self):
