@@ -66,8 +66,9 @@ class droneVision:
         rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
 
     def depth_callback(self, msg):
-        depth_map = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
-        self.depth_img = cv.normalize(depth_map, None, 0, 255, cv.NORM_MINMAX, cv.CV_32FC1)
+        #depth_map = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
+        #self.depth_img = cv.normalize(depth_map, None, 0, 255, cv.NORM_MINMAX, cv.CV_32FC1)
+        self.depth_img = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
         rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape))
         
         """
@@ -76,7 +77,7 @@ class droneVision:
         except CvBridgeError as e:
             rospy.logerr(e)
 
-        self.depth_array = np.array(depth_img)
+        self.depth_array = np.array(depth_img, dtype=np.float32)
         rospy.logdebug("Depth image received, shape: " + str(self.depth_array.shape))
        """ 
 
