@@ -188,18 +188,18 @@ class droneVision:
 
         if not self.closest_is_none:
             closest_bearing_rad = np.radians(drone_heading + self.closest_bearing) # With respect to North
-            closest_buoy_lat = round(np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad)), self.GPS_round)
-            closest_buoy_lon = round(drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat)), self.GPS_round)
-            self.closest_GPS.append(np.degrees(closest_buoy_lat))
-            self.closest_GPS.append(np.degrees(closest_buoy_lon)) 
+            closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.closest_dist/R) * np.cos(closest_bearing_rad))
+            closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(closest_bearing_rad) * np.sin(self.closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.closest_dist/R) - np.sin(drone_lat_rad) * np.sin(closest_buoy_lat))
+            self.closest_GPS.append(round(np.degrees(closest_buoy_lat), self.GPS_round))
+            self.closest_GPS.append(round(np.degrees(closest_buoy_lon), self.GPS_round)) 
             rospy.logdebug("Closest buoy GPS: " + str(self.closest_GPS))
 
             if not self.second_is_none: # and not self.closest_color == 'yellow_buoy':
                 second_closest_bearing_rad = np.radians(drone_heading + self.second_closest_bearing) # With respect to North
-                second_closest_buoy_lat = round(np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad)), self.GPS_round)
-                second_closest_buoy_lon = round(drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat)), self.GPS_round)
-                self.second_closest_GPS.append(np.degrees(second_closest_buoy_lat))
-                self.second_closest_GPS.append(np.degrees(second_closest_buoy_lon)) 
+                second_closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad))
+                second_closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat))
+                self.second_closest_GPS.append(round(np.degrees(second_closest_buoy_lat), self.GPS_round))
+                self.second_closest_GPS.append(round(np.degrees(second_closest_buoy_lon), self.GPS_round)) 
                 rospy.logdebug("Second closest buoy GPS: " + str(self.second_closest_GPS))
             #elif self.closest_color == 'yellow_buoy':
              #   rospy.loginfo("Yellow buoy detected.")
