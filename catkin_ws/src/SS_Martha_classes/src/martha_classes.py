@@ -29,7 +29,7 @@ class droneVision:
         self.sub_img = rospy.Subscriber("/zed2/zed_node/left/image_rect_color", Image, self.image_callback)
         self.sub_depth = rospy.Subscriber("/zed2/zed_node/depth/depth_registered", Image, self.depth_callback)
         self.sub_cam_info = rospy.Subscriber("/zed2/zed_node/left/camera_info", CameraInfo, self.cam_info_callback)
-        
+
         try:
             while self.img_array == None:
                 rospy.loginfo("Waiting for image...")
@@ -43,6 +43,9 @@ class droneVision:
                 time.sleep(1)
         except ValueError:
             pass
+
+        rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
+        rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape)) 
         
         rospy.loginfo("Initialized!")
 
@@ -50,13 +53,10 @@ class droneVision:
         img_left = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
         img_left = img_left[:,:,:3]
         self.img_array = cv.normalize(img_left, None, 0, 255, cv.NORM_MINMAX, cv.CV_8U)
-         
-        rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
 
     def depth_callback(self, msg):
         depth_map = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
         self.depth_img = depth_map[:,:, 0] 
-        rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape))
 
     def cam_info_callback(self, msg):
         width = msg.width
@@ -109,9 +109,9 @@ class droneVision:
             self.closest_color = self.color_list[closest_index]
             self.closest_bearing = round(self.bearing_list[closest_index], 2)
             self.closest_is_none = False
-            rospy.loginfo("Distance to " + self.closest_color + ": " + str(self.closest_dist) + "m " + "at bearing: " + str(self.closest_bearing) + " degrees.")
+            rospy.logdebug("Distance to " + self.closest_color + ": " + str(self.closest_dist) + "m " + "at bearing: " + str(self.closest_bearing) + " degrees.")
         except IndexError:
-            rospy.logwarn("No buoys detected!")
+            rospy.logdebug("No buoys detected!")
             pass
     
     def get_2nd_closest_buoy(self):
@@ -130,9 +130,9 @@ class droneVision:
             self.second_closest_color = self.color_list[second_closest_index]
             self.second_closest_bearing = round(self.bearing_list[second_closest_index], 2)
             self.second_is_none = False
-            rospy.loginfo("Distance to " + self.second_closest_color + ": " + str(self.second_closest_dist) + "m " + "at bearing: " + str(self.second_closest_bearing) + " degrees.")
+            rospy.logdebug("Distance to " + self.second_closest_color + ": " + str(self.second_closest_dist) + "m " + "at bearing: " + str(self.second_closest_bearing) + " degrees.")
         except IndexError:
-            rospy.logwarn("Second buoy not detected!")
+            rospy.logdebug("Second buoy not detected!")
             pass
 
     def check_buoy_gate(self):
@@ -147,28 +147,37 @@ class droneVision:
             return False
 
     def check_gate_orientation(self):
-        if (self.closest_bearing - self.second_closest_bearing) < 0:
-            rospy.logdebug("Green buoy is closest and red buoy is second closest.")
-            rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
-            return True
-        else:
-            rospy.logdebug("Red buoy is closest and green buoy is second closest.")
-            rospy.logdebug("Red buoy is on the left, and green buoy is on the right.")
-            return False
+        try:
+            if (self.closest_bearing - self.second_closest_bearing) < 0:
+                rospy.logdebug("Green buoy is closest and red buoy is second closest.")
+                rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
+                return True
+            else:
+                rospy.logdebug("Red buoy is closest and green buoy is second closest.")
+                rospy.logdebug("Red buoy is on the left, and green buoy is on the right.")
+                return False
+        except TypeError:
+            rospy.logdebug("Can't check gate orientation!")
 
     def check_rel_dist(self):
-        a = self.closest_dist
-        c = self.second_closest_dist
-        beta = np.radians(self.closest_bearing - self.second_closest_bearing)
-        rel_dist = np.sqrt(a**2 + c**2 - 2*a*c*np.cos(beta))
-
-        if rel_dist < self.rel_dist_thresh:
-            rospy.logdebug("Relative distance is less than threshold.")
-            return True
-        else:
-            rospy.logdebug("Relative distance between buoys is greater than threshold.")
-            return False
+        self.rel_dist_err = False
+        try:
+            a = self.closest_dist
+            c = self.second_closest_dist
+            beta = np.radians(self.closest_bearing - self.second_closest_bearing)
+            rel_dist = np.sqrt(a**2 + c**2 - 2*a*c*np.cos(beta))
+            rospy.logdebug("Relative distance between the two closest buoys: " + str(rel_dist))
         
+            if rel_dist < self.rel_dist_thresh:
+                rospy.logdebug("Relative distance is less than threshold.")
+                return True
+            else:
+                rospy.logdebug("Relative distance between buoys is greater than threshold.")
+                return False
+        except TypeError:
+            rospy.logerr("Invalid value for distance or bearing")
+            self.rel_dist_err = True
+
     def buoy_GPS_loc(self, R=6371e3):
         self.closest_GPS = []
         self.second_closest_GPS = []
@@ -228,12 +237,12 @@ class droneVision:
     @staticmethod
     def hdg_rel_to_bearing(_bearing, rel_angle, drone_hdg):
         out_heading = None
-        if (_bearing > 0 and _bearing < 90) or (_bearing < 0 and _bearing > -90):
+        if (_bearing >= 0 and _bearing < 90) or (_bearing < 0 and _bearing >= -90):
             if (drone_hdg >= 270 and drone_hdg < 360) or (drone_hdg >= 0 and drone_hdg < 90):
                 out_heading = _bearing - rel_angle
             else:
                 out_heading = _bearing + rel_angle
-        elif (_bearing > 90 and _bearing < 180) or (_bearing < -90 and _bearing > -180):
+        elif (_bearing >= 90 and _bearing <= 180) or (_bearing < -90 and _bearing >= -180):
             if drone_hdg >= 90 and drone_hdg < 270:
                 out_heading = _bearing + rel_angle
             else:
@@ -246,8 +255,9 @@ class droneVision:
         self.wp_lon = round((self.closest_GPS[1] + self.second_closest_GPS[1]) / 2, self.GPS_round)
 
         buoys_bearing = self.two_points_bearing(self.closest_GPS[0], self.closest_GPS[1], self.second_closest_GPS[0], self.second_closest_GPS[1])
+        rospy.logdebug("Buoys bearing: " + str(buoys_bearing))
         out_gate_heading = self.hdg_rel_to_bearing(buoys_bearing, 90, self.communication.heading)
-
+        rospy.logdebug("Out of gate heading: " + str(out_gate_heading))
         self.wp_lat_out, self.wp_lon_out = self.dist_to_GPS_cords(self.out_dist, out_gate_heading, self.wp_lat, self.wp_lon)
 
         rospy.loginfo("Waypoint set at: " + "(" +  str(self.wp_lat) + ", " + str(self.wp_lon) + ")")
