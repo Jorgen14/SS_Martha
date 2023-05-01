@@ -1,4 +1,5 @@
 import time
+import math
 import cv2 as cv
 import numpy as np
 from ultralytics import YOLO
@@ -71,6 +72,7 @@ class droneVision:
     
     def detection_results(self):
         results = self.get_detections()
+        self.depth_is_nan = False
 
         rospy.logdebug("Getting detection results...")
 
@@ -82,7 +84,10 @@ class droneVision:
             for box in result.boxes.xyxy:
                 center = ((box[2].item() - box[0].item()) / 2 + box[0].item(), 
                           (box[3].item() - box[1].item()) / 2 + box[1].item())
-                self.depth_list.append(self.depth_img[int(center[1]), int(center[0])])
+                depth_at_det = self.depth_img[int(center[1]), int(center[0])]
+                if math.isnan(depth_at_det):
+                    self.depth_is_nan = True
+                self.depth_list.append(depth_at_det)
                 Tx = int(center[0]) - self.cx
                 theta = Tx * self.lamda_x
                 self.bearing_list.append(theta)
