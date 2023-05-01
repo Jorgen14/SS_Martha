@@ -41,7 +41,7 @@ while not rospy.is_shutdown():
                     rospy.loginfo("Yellow buoy detected.")
                     MarthaVision.obstacle_channel_yellow_buoy()
                     #MarthaVision.communication.send_waypoint(MarthaVision.wp_yellow_buoy_lat, MarthaVision.wp_yellow_buoy_lon, curr=True)
-
+                
                 elif MarthaVision.closest_color == "yellow_buoy" and not MarthaVision.second_is_none:
                     rospy.loginfo("Yellow buoy detected.")
                     if MarthaVision.check_rel_dist() and not MarthaVision.rel_dist_err:
@@ -59,7 +59,7 @@ while not rospy.is_shutdown():
                         pass
 
                 elif (MarthaVision.closest_color == "red_buoy" or MarthaVision.closest_color == "green_buoy") and MarthaVision.second_is_none:
-                    rospy.loginfo("Only one non yellow buoy detected, moving closer to get a better look.")
+                    rospy.logwarn("Only one non yellow buoy detected, moving closer to get a better look.")
                     #MarthaVision.communication.send_waypoint(MarthaVision.closest_GPS[0], MarthaVision.closest_GPS[1], curr=True)
 
                 else:

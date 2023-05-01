@@ -151,16 +151,22 @@ class droneVision:
             rospy.logdebug("Gate not found.")
             return False
 
-    def check_gate_orientation(self):
+    def check_gate_orientation(self): # Assumes check_buoy_gate is already called
         try:
-            if (self.closest_bearing - self.second_closest_bearing) < 0:
-                rospy.logdebug("Green buoy is closest and red buoy is second closest.")
-                rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
-                return True
+            if self.closest_color == "green_buoy":
+                if (self.closest_bearing - self.second_closest_bearing) < 0: 
+                    rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
+                    return True
+                else:
+                    rospy.logdebug("Red buoy is on the left, and green buoy is on the right.") 
+                    return False
             else:
-                rospy.logdebug("Red buoy is closest and green buoy is second closest.")
-                rospy.logdebug("Red buoy is on the left, and green buoy is on the right.")
-                return False
+                if (self.closest_bearing - self.second_closest_bearing) > 0:                     
+                   rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
+                   return True                                                                  
+                else:                                                                            
+                   rospy.logdebug("Red buoy is on the left, and green buoy is on the right.")
+                   return False    
         except TypeError:
             rospy.logdebug("Can't check gate orientation!")
 
