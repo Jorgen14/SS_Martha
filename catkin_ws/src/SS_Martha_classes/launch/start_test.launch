@@ -1,7 +1,12 @@
 <launch>
+
+	<include file="$(find zed_wrapper)/launch/zed2.launch"/>
+	<include file="$(find mavros)/launch/apm.launch"/>
+
 	<node pkg="SS_Martha_classes"
 	  type="test_classes.py"
 	  name="TestNode"
 	  output="screen">
 	</node>
+	
 </launch>
