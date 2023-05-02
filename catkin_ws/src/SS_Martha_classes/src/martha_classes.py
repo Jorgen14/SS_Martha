@@ -230,8 +230,13 @@ class droneVision:
 
         lat2 = np.arcsin(np.sin(lat_rad) * np.cos(dist/R) + np.cos(lat_rad) * np.sin(dist/R) * np.cos(a))
         lon2 = lon_rad + np.arctan2(np.sin(a) * np.sin(dist/R) * np.cos(lat_rad), np.cos(dist/R) - np.sin(lat_rad) * np.sin(lat2))
+        
+        lat_deg = round(np.degrees(lat2), 6)
+        lon_deg = round(np.degrees(lon2), 6)  
 
-        return round(np.degrees(lat2), 6), round(np.degrees(lon2), 6)
+        rospy.logdebug("Waypoint set at: (" + str(lat_deg) + ", " + str(lon_deg) + ")")
+        
+        return lat_deg, lon_deg
     
     @staticmethod
     def two_points_bearing(lat1, lon1, lat2, lon2):
