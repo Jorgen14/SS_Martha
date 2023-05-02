@@ -3,6 +3,7 @@ import math
 import cv2 as cv
 import numpy as np
 from ultralytics import YOLO
+from datetime import datetime, timedelta
 import rospy
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from std_msgs.msg import Float64
@@ -289,48 +290,47 @@ class droneVision:
         rospy.loginfo("Navigating around yellow_buoy, waypoint set at: " + "(" +  str(self.wp_yellow_buoy_lat) + ", " + str(self.wp_yellow_buoy_lon) + ")")
     
     def nav_channel_waypoint(self):
-        self.detection_results()
-        self.get_closest_buoy()
-        self.get_2nd_closest_buoy()
-        self.buoy_GPS_loc()
+        if not self.communication.wp_set:
+            self.detection_results()
+            if not self.depth_is_nan:
+                self.get_closest_buoy() 
+                self.get_2nd_closest_buoy()
+                self.buoy_GPS_loc()
+                if self.check_buoy_gate():
+                    if self.check_gate_orientation():
+                        self.obstacle_channel_gate()  
+                        #self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+                        #self.communication.send_waypoint(self.wp_lat_out, self.wp_lon_out)
+                    else:
+                        rospy.loginfo("Buoy gate detected, but not in the right orientation.")
+                        rospy.loginfo("Rotating 180 degrees")              
 
-        if self.check_buoy_gate() and self.check_gate_orientation():
-            rospy.loginfo("Gate detected.")
-            self.obstacle_channel_gate()
-            self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True)
-            self.communication.send_waypoint(self.wp_lat_out, self.wp_lon_out)
+                elif self.closest_color == "yellow_buoy" and self.second_is_none:
+                    rospy.loginfo("Yellow buoy detected.")
+                    self.obstacle_channel_yellow_buoy()
+                    #self.communication.send_waypoint(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon, curr=True)
 
-        elif self.closest_color == "yellow_buoy" and self.second_is_none:
-                rospy.loginfo("Yellow buoy detected.")
-                self.obstacle_channel_yellow_buoy()
-                self.communication.send_waypoint(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon, curr=True)
+                elif (self.closest_color == "red_buoy" or self.closest_color == "green_buoy") and self.second_is_none:
+                    rospy.logwarn("Only one non yellow buoy detected, moving closer to get a better look.")
+                    #self.communication.send_waypoint(self.closest_GPS[0], self.closest_GPS[1], curr=True)
 
-        elif self.closest_color == "yellow_buoy" and not self.second_is_none:
-            rospy.loginfo("Yellow buoy detected.")
-            if self.check_rel_dist():
-                rospy.loginfo("Yellow buoy detected, possibly false negative.")
-                rospy.loginfo("Moving closer to get a better look.")
-                self.obstacle_channel_gate()
-                self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True)
-                self.communication.send_waypoint(self.wp_lat_out, self.wp_lon_out)
+                else:
+                    rospy.loginfo("No detections, moving " + str(self.no_buoy_dist) + "m forward to check again.")
+                    self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.no_buoy_dist, 0, self.communication.lat, self.communication.lon) 
+                    #self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+
+                wpTimer = datetime.now() + timedelta(seconds=10)
+                time.sleep(1)
+
             else:
-                rospy.loginfo("Two buoys detected, but not a gate.")
-                rospy.loginfo("Navigating around yellow buoy.")
-                self.obstacle_channel_yellow_buoy()
-                self.communication.send_waypoint(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon, curr=True)
-
-        elif not self.closest_color == "yellow_buoy" and self.second_is_none:
-            rospy.loginfo("Only one non yellow buoy detected, moving closer to get a better look.")
-            self.communication.send_waypoint(self.closest_GPS[0], self.closest_GPS[1], curr=True)
-
-        elif not self.check_gate_orientation():
-            rospy.loginfo("Buoy gate detected, but not in the right orientation.")
-            rospy.loginfo("Rotaing 180 degrees.")
-
+                rospy.logerr("Depth is NaN, trying again...")
+            
+        elif datetime.now() < wpTimer:
+            self.communication.wp_set = False
+        
         else:
-            rospy.loginfo("No detections, moving " + str(self.no_buoy_dist) + "m forward to check again.")
-            self.wp_lon, self.wp_lat = self.dist_to_GPS_cords(self.no_buoy_dist, 0, self.communication.lat, self.communication.lon) 
-            self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True)
+            rospy.loginfo("Waypoints set, waiting " + str(wpTimer - datetime.now()) + "s to set next waypoint.")
+            time.sleep(1)
 
 
 
@@ -404,9 +404,8 @@ class apCommunication: # Communication with the autopilot
         try:
             serviceReq = rospy.ServiceProxy('mavros/mission/push', WaypointPush)
             serviceRes = serviceReq(start_index=0, waypoints=self.wl)
-            flag = serviceRes.success
-            if flag:
-                self.wp_set = True
+            self.wp_set = serviceRes.success
+            if self.wp_set:
                 rospy.logdebug("Waypoint successfully pushed")
             else:
                 rospy.logerr("FAILURE: PUSHING WP!")		
