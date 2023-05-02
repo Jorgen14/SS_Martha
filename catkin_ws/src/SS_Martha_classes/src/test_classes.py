@@ -4,7 +4,7 @@ import time
 from martha_classes import droneVision, apCommunication
 from datetime import datetime, timedelta
 
-ROS_DEBUG = True
+ROS_DEBUG = False
 
 if ROS_DEBUG:
     rospy.init_node("TestNode", log_level=rospy.DEBUG)

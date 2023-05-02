@@ -36,15 +36,13 @@ class droneVision:
             while self.img_array == None:
                 rospy.loginfo("Waiting for image...")
                 time.sleep(1)
-        except ValueError:
-            pass
-        
-        try: 
             while self.depth_img == None:
                 rospy.loginfo("Waiting for depth image...")
                 time.sleep(1)
         except ValueError:
             pass
+        
+        self.get_detections() # To warm up the model
 
         rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
         rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape)) 
@@ -304,8 +302,9 @@ class droneVision:
                 if self.check_buoy_gate():
                     if self.check_gate_orientation():
                         self.obstacle_channel_gate()  
-                        #self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True) 
-                        #self.communication.send_waypoint(self.wp_lat_out, self.wp_lon_out)
+                        self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+                        self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
+                        self.communication.send_waypoint()
                     else:
                         rospy.loginfo("Buoy gate detected, but not in the right orientation.")
                         rospy.loginfo("Rotating 180 degrees")              
@@ -313,33 +312,36 @@ class droneVision:
                 elif self.closest_color == "yellow_buoy" and self.second_is_none:
                     rospy.loginfo("Yellow buoy detected.")
                     self.obstacle_channel_yellow_buoy()
-                    #self.communication.send_waypoint(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon, curr=True)
+                    self.communication.make_waypoint(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon, curr=True)
+                    self.communication.send_waypoint()
 
                 elif (self.closest_color == "red_buoy" or self.closest_color == "green_buoy") and self.second_is_none:
                     rospy.logwarn("Only one non yellow buoy detected, moving closer to get a better look.")
-                    #self.communication.send_waypoint(self.closest_GPS[0], self.closest_GPS[1], curr=True)
+                    self.communication.make_waypoint(self.closest_GPS[0], self.closest_GPS[1], curr=True)
+                    self.communication.send_waypoint()
 
                 else:
                     rospy.loginfo("No detections, moving " + str(self.no_buoy_dist) + "m forward to check again.")
                     self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.no_buoy_dist, 0, self.communication.lat, self.communication.lon) 
-                    #self.communication.send_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+                    self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+                    self.communication.send_waypoint()
 
-                wpTimer = datetime.now() + timedelta(seconds=10)
+                wpTimer = datetime.now() + timedelta(seconds=15)
                 time.sleep(1)
 
             else:
                 rospy.logerr("Depth is NaN, trying again...")
             
-        elif datetime.now() < wpTimer:
+        elif datetime.now() > wpTimer:
             self.communication.wp_set = False
         
         else:
             rospy.loginfo("Waypoints set, waiting " + str(wpTimer - datetime.now()) + "s to set next waypoint.")
             time.sleep(1)
 
+# ---------------------------------------------- ROS Communication ---------------------------------------------- #
 
-
-class apCommunication: # Communication with the autopilot
+class apCommunication:
     def __init__(self): 
 
         self.pub_vel = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=10)
@@ -353,16 +355,16 @@ class apCommunication: # Communication with the autopilot
         
         self.lat = None
         self.lon = None
+        self.wp_list = []
         self.heading = None
         self.lin_vel_x = None
         self.lin_vel_y = None
         self.ang_vel_z = None
         self.wp_reached = None
-        self.wp_list = None
         self.wp_set = False
         self.check = None
 
-        #self.rate = rospy.Rate(10)
+        rospy.loginfo("ROS communication initialized!")
 
     def gps_callback(self, msg):
         self.lat = msg.latitude
@@ -389,8 +391,7 @@ class apCommunication: # Communication with the autopilot
 
     #     rospy.logdebug("Waypoint list: " + str(self.wp_list))
 
-    def send_waypoint(self, lat, lon, cmd=16, curr=False, autCont=True):
-        self.wl = []
+    def make_waypoint(self, lat, lon, cmd=16, curr=False, autCont=True):
         wp = Waypoint()
         wp.frame = 0 # Global frame
         wp.command = cmd  # 16 = Nav command, 
@@ -403,8 +404,9 @@ class apCommunication: # Communication with the autopilot
         wp.x_lat = lat # Latitude
         wp.y_long = lon # Longitude
         wp.z_alt = 0
-        self.wl.append(wp)
+        self.wp_list.append(wp)
 
+    def send_waypoint(self):
         rospy.wait_for_service('mavros/mission/push')
         try:
             serviceReq = rospy.ServiceProxy('mavros/mission/push', WaypointPush)
