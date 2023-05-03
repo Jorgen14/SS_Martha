@@ -24,6 +24,7 @@ class droneVision:
 
         self.img_array = None
         self.depth_img = None
+        self.wpTimer = 0
 
         self.communication = apCommunication()
         self.model = YOLO('/home/navo/GitHub/SS_Martha/YOLOv8/buoy_s.pt') 
@@ -316,30 +317,30 @@ class droneVision:
                     rospy.loginfo("Yellow buoy detected.")
                     self.obstacle_channel_yellow_buoy()
                     self.communication.change_mode("GUIDED")
-                    self.communication.send_guided_wp(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon, curr=True)
+                    self.communication.send_guided_wp(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon)
 
                 elif (self.closest_color == "red_buoy" or self.closest_color == "green_buoy") and self.second_is_none:
                     rospy.logwarn("Only one non yellow buoy detected, moving closer to get a better look.")
                     self.communication.change_mode("GUIDED")
-                    self.communication.send_guided_wp(self.closest_GPS[0], self.closest_GPS[1], curr=True)
+                    self.communication.send_guided_wp(self.closest_GPS[0], self.closest_GPS[1])
 
                 else:
                     rospy.loginfo("No detections, moving " + str(self.no_buoy_dist) + "m forward to check again.")
                     self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.no_buoy_dist, 0, self.communication.lat, self.communication.lon) 
                     self.communication.change_mode("GUIDED")
-                    self.communication.send_guided_wp(self.wp_lat, self.wp_lon, curr=True)
+                    self.communication.send_guided_wp(self.wp_lat, self.wp_lon)
 
-                wpTimer = datetime.now() + timedelta(seconds=15)
+                self.wpTimer = datetime.now() + timedelta(seconds=15)
                 time.sleep(1)
 
             else:
                 rospy.logerr("Depth is NaN, trying again...")
             
-        elif datetime.now() > wpTimer:
+        elif datetime.now() > self.wpTimer:
             self.communication.wp_set = False
         
         else:
-            rospy.loginfo("Waypoints set, waiting " + str(wpTimer - datetime.now()) + "s to set next waypoint.")
+            rospy.loginfo("Waypoints set, waiting " + str(self.wpTimer - datetime.now()) + "s to set next waypoint.")
             time.sleep(1)
 
 # ---------------------------------------------- ROS Communication ---------------------------------------------- #
