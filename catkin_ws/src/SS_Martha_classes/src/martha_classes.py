@@ -496,7 +496,7 @@ class apCommunication:
         rospy.wait_for_service('mavros/mission/push')
         try:
             serviceReq = rospy.ServiceProxy('mavros/mission/push', WaypointPush)
-            serviceRes = serviceReq(start_index=0, waypoints=self.wl)
+            serviceRes = serviceReq(start_index=0, waypoints=self.wp_list)
             self.wp_set = serviceRes.success
             if self.wp_set:
                 rospy.logdebug("Waypoint successfully pushed")

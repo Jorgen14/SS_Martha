@@ -28,9 +28,15 @@ while not rospy.is_shutdown():
     startTime = datetime.now()
     try:          
         if not MarthaCom.wp_set:
-            MarthaCom.change_mode("GUIDED")
+            #MarthaCom.change_mode("GUIDED")
             #MarthaCom.send_guided_wp(-35.362240, 149.165058) 
-            MarthaCom.send_guided_wp(-35.363105, 149.163350)
+            #MarthaCom.send_guided_wp(62.472200, 6.232658)
+            MarthaCom.make_waypoint(62.472200, 6.232658, curr=True)
+            MarthaCom.make_waypoint(62.472359, 6.232705)
+            #MarthaCom.make_waypoint(62.472192, 6.232396)
+            MarthaCom.send_waypoint()
+            MarthaCom.change_mode("AUTO")
+
         else:
             break
         scriptTime = datetime.now() - startTime
