@@ -19,6 +19,11 @@ MarthaCom = apCommunication()
 
 MarthaCom.clear_waypoints()
 
+if not MarthaCom.is_armed:
+    MarthaCom.arm(True)
+
+MarthaCom.change_mode("LOITER")
+
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:          

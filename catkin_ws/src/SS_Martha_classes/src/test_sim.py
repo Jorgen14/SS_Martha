@@ -31,6 +31,7 @@ while not rospy.is_shutdown():
             #MarthaCom.change_mode("GUIDED")
             #MarthaCom.send_guided_wp(-35.362240, 149.165058) 
             #MarthaCom.send_guided_wp(62.472200, 6.232658)
+            MarthaCom.make_waypoint(0, 0)
             MarthaCom.make_waypoint(62.472200, 6.232658, curr=True)
             MarthaCom.make_waypoint(62.472359, 6.232705)
             #MarthaCom.make_waypoint(62.472192, 6.232396)

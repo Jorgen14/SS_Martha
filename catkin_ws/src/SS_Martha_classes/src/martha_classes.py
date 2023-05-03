@@ -301,10 +301,13 @@ class droneVision:
                 self.buoy_GPS_loc()
                 if self.check_buoy_gate():
                     if self.check_gate_orientation():
-                        self.obstacle_channel_gate()  
+                        self.obstacle_channel_gate()
+                        self.communication.clear_waypoints()  
+                        self.communication.make_waypoint(0, 0)
                         self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
                         self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
                         self.communication.send_waypoint()
+                        self.communication.change_mode("AUTO")
                     else:
                         rospy.loginfo("Buoy gate detected, but not in the right orientation.")
                         rospy.loginfo("Rotating 180 degrees")              
@@ -312,19 +315,19 @@ class droneVision:
                 elif self.closest_color == "yellow_buoy" and self.second_is_none:
                     rospy.loginfo("Yellow buoy detected.")
                     self.obstacle_channel_yellow_buoy()
-                    self.communication.make_waypoint(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon, curr=True)
-                    self.communication.send_waypoint()
+                    self.communication.change_mode("GUIDED")
+                    self.communication.send_guided_wp(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon, curr=True)
 
                 elif (self.closest_color == "red_buoy" or self.closest_color == "green_buoy") and self.second_is_none:
                     rospy.logwarn("Only one non yellow buoy detected, moving closer to get a better look.")
-                    self.communication.make_waypoint(self.closest_GPS[0], self.closest_GPS[1], curr=True)
-                    self.communication.send_waypoint()
+                    self.communication.change_mode("GUIDED")
+                    self.communication.send_guided_wp(self.closest_GPS[0], self.closest_GPS[1], curr=True)
 
                 else:
                     rospy.loginfo("No detections, moving " + str(self.no_buoy_dist) + "m forward to check again.")
                     self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.no_buoy_dist, 0, self.communication.lat, self.communication.lon) 
-                    self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
-                    self.communication.send_waypoint()
+                    self.communication.change_mode("GUIDED")
+                    self.communication.send_guided_wp(self.wp_lat, self.wp_lon, curr=True)
 
                 wpTimer = datetime.now() + timedelta(seconds=15)
                 time.sleep(1)
