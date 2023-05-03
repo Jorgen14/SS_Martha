@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 import rospy
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from std_msgs.msg import Float64
+#from std_msgs.srv import Empty, EmptyRequest
 from geometry_msgs.msg import Twist, TwistStamped
 from mavros_msgs.msg import Waypoint, WaypointReached, WaypointList, State, GlobalPositionTarget
-from mavros_msgs.srv import WaypointPush, WaypointClear, CommandBool, CommandBoolRequest, SetMode, SetModeRequest
+from mavros_msgs.srv import WaypointPush, WaypointPull, WaypointClear, CommandBool, CommandBoolRequest, SetMode, SetModeRequest
 
 class droneVision:
 
@@ -303,8 +304,8 @@ class droneVision:
                 if self.check_buoy_gate():
                     if self.check_gate_orientation():
                         self.obstacle_channel_gate()
-                        self.communication.clear_waypoints()  
-                        self.communication.make_waypoint(0, 0)
+                        self.communication.change_mode("GUIDED")
+                        self.communication.clear_waypoints()
                         self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
                         self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
                         self.communication.send_waypoint()
@@ -358,7 +359,7 @@ class apCommunication:
         self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
         self.sub_vel = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.vel_callback)
         self.sub_wp_reached = rospy.Subscriber("/mavros/mission/reached", WaypointReached, self.wp_reached_callback)
-        # self.sub_wps = rospy.Subscriber("/mavros/mission/waypoints", WaypointList, self.wps_callback)
+        self.sub_wps = rospy.Subscriber("/mavros/mission/waypoints", WaypointList, self.wps_callback)
         
         self.is_connected = None
         self.is_armed = None
@@ -370,11 +371,14 @@ class apCommunication:
         self.lat = None
         self.lon = None
         self.wp_list = []
+        self.wps = None
         self.heading = None
         self.lin_vel_x = None
         self.lin_vel_y = None
         self.ang_vel_z = None
-        self.wp_reached = None
+        self.wp_reached = False
+        self.reached_seq = None
+        self.curr_seq = None
         self.wp_set = False
         self.check = None
 
@@ -386,6 +390,8 @@ class apCommunication:
                 time.sleep(1)
             except rospy.ROSInterruptException:
                 break
+
+        self.change_mode("LOITER")
 
         rospy.loginfo("MAVROS connection status: " + str(self.is_connected))
         rospy.loginfo("MAVROS armed status: " + str(self.is_armed))
@@ -399,19 +405,6 @@ class apCommunication:
         self.is_connected = data.connected
         self.is_armed = data.armed
         self.ini_mode = data.mode
-
-    # def arm(self, status):
-    #     rospy.wait_for_service('/mavros/cmd/arming')
-    #     try:
-    #         if self.arming != status:	
-    #             arming_cl = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
-    #             response = arming_cl(value=status)
-    #             rospy.loginfo(response)
-    #             self.arming = status
-    #         else:
-    #             rospy.logwarn("Vessel is already armed with the desired status!")
-    #     except rospy.ServiceException as e:
-    #         rospy.logerr("Arming failed: %s" %e)
 
     def arm(self, status):
         rospy.wait_for_service('/mavros/cmd/arming')
@@ -427,19 +420,6 @@ class apCommunication:
                 rospy.logwarn("Vessel is already armed with the desired status!")
         except rospy.ServiceException as e:
             rospy.logerr("Arming failed: %s" %e)
-
-    # def change_mode(self, new_mode):
-    #     rospy.wait_for_service('/mavros/set_mode')
-    #     try:
-    #         if self.mode != new_mode:
-    #             change_mode = rospy.ServiceProxy('/mavros/set_mode', SetMode)
-    #             response = change_mode(custom_mode=new_mode)
-    #             rospy.loginfo(response)
-    #             self.mode = new_mode
-    #         else:
-    #             rospy.logwarn("Vessel is already in the desired mode!")
-    #     except rospy.ServiceException as e:
-    #         rospy.logerr("Mode change failed: %s" %e)
 
     def change_mode(self, new_mode):
         rospy.wait_for_service('/mavros/set_mode')
@@ -472,14 +452,39 @@ class apCommunication:
         rospy.logdebug("Drone linear velocity " + "forward: " + str(self.lin_vel_x) + ", " + "sideways: " + str(self.lin_vel_y))
         rospy.logdebug("Drone angular velocity: " + str(self.ang_vel_z))
 
+    def wps_callback(self, msg):
+        self.curr_seq = msg.current_seq
+        self.wps = msg.waypoints
+        rospy.logdebug("Waypoint list: " + str(self.wps))
+
     def wp_reached_callback(self, msg):
-        self.wp_reached = msg.wp_seq
+        self.reached_seq = msg.wp_seq
+        self.wp_reached = True 
+        rospy.logwarn("Waypoint reached!")
         rospy.logdebug("Waypoint reached: " + str(self.wp_reached))
 
-    # def wps_callback(self, msg):
-    #     self.wp_list = msg.waypoints
+    def auto_wp_reached(self): 
+        if self.mode == "AUTO" and (self.curr_seq == self.reached_seq):
+            time.sleep(0.1)
+            if self.curr_seq == self.reached_seq:
+                return True
+            else:
+                return False
+        else:
+            return False
+    
+    def guided_wp_reached(self):
+        if self.wp_reached and self.mode == "GUIDED":
+            return True
+        else:
+            return False
 
-    #     rospy.logdebug("Waypoint list: " + str(self.wp_list))
+    def waypoint_reached(self):
+        if self.auto_wp_reached() or self.guided_wp_reached():
+            self.wp_reached = False
+            return True
+        else:
+            return False
 
     def make_waypoint(self, lat, lon, cmd=16, curr=False, autCont=True):
         wp = Waypoint()
@@ -508,6 +513,31 @@ class apCommunication:
                 rospy.logerr("FAILURE: PUSHING WP!")		
         except rospy.ServiceException as e:
             rospy.logerr("Failed to send WayPoint: %s\n" %e)
+    """
+    def pull_waypoint(self):
+        rospy.wait_for_service('mavros/mission/pull')
+        try:
+            response = rospy.ServiceProxy('mavros/mission/pull', WaypointPull)
+            status = response.success
+            self.wps = response.wp_recieved
+            if status:
+                rospy.loginfo("Waypoints: " + str())
+                rospy.logdebug("Waypoint successfully pulled!")
+            else:
+                rospy.logerr("FAILURE: PULLING WPS!")		
+        except rospy.ServiceException as e:
+            rospy.logerr("Failed to pull WayPoint: %s\n" %e)
+    """
+    def clear_waypoints(self):
+        rospy.wait_for_service('mavros/mission/clear')
+        try:
+            response = rospy.ServiceProxy('mavros/mission/clear', WaypointClear)
+            self.wp_list = []
+            self.make_waypoint(0, 0)		
+            return response.call().success
+        except rospy.ServiceException as e:
+            rospy.logerr("Clear waypoint failed: %s"%e)
+            return False        
 
     def send_guided_wp(self, lat, lon, yaw=0):
         self.guided_wp.latitude = lat
@@ -524,15 +554,6 @@ class apCommunication:
             else:
                 rospy.logdebug("No subscribers to guided_wp yet, waiting to try again!")
                 time.sleep(0.1)
-
-    def clear_waypoints(self):
-        rospy.wait_for_service('mavros/mission/clear')
-        try:
-            response = rospy.ServiceProxy('mavros/mission/clear', WaypointClear)		
-            return response.call().success
-        except rospy.ServiceException as e:
-            rospy.logerr("Clear waypoint failed: %s"%e)
-            return False
         
     def rotate_right(self, ang_vel):
         self.cmd_vel.linear.x = 0
