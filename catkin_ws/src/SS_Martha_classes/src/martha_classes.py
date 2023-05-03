@@ -8,8 +8,8 @@ import rospy
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from std_msgs.msg import Float64
 from geometry_msgs.msg import Twist, TwistStamped
-from mavros_msgs.msg import Waypoint, WaypointReached, WaypointList
-from mavros_msgs.srv import WaypointPush, WaypointClear
+from mavros_msgs.msg import Waypoint, WaypointReached, WaypointList, State, GlobalPositionTarget
+from mavros_msgs.srv import WaypointPush, WaypointClear, CommandBool, CommandBoolRequest, SetMode, SetModeRequest
 
 class droneVision:
 
@@ -346,13 +346,23 @@ class apCommunication:
 
         self.pub_vel = rospy.Publisher("/mavros/setpoint_velocity/cmd_vel_unstamped", Twist, queue_size=10)
         self.cmd_vel = Twist()
+        self.pub_guided_wp = rospy.Publisher("/mavros/setpoint_raw/global", GlobalPositionTarget, queue_size=10)
+        self.guided_wp = GlobalPositionTarget()
 
+        self.sub_state = rospy.Subscriber("/mavros/state", State, self.state_callback)
         self.sub_GPS = rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.gps_callback)
         self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
         self.sub_vel = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.vel_callback)
         self.sub_wp_reached = rospy.Subscriber("/mavros/mission/reached", WaypointReached, self.wp_reached_callback)
         # self.sub_wps = rospy.Subscriber("/mavros/mission/waypoints", WaypointList, self.wps_callback)
         
+        self.is_connected = None
+        self.is_armed = None
+        self.ini_mode = None
+        self.ctrl_c = False
+
+        self.arming = None
+        self.mode = None
         self.lat = None
         self.lon = None
         self.wp_list = []
@@ -364,7 +374,83 @@ class apCommunication:
         self.wp_set = False
         self.check = None
 
-        rospy.loginfo("ROS communication initialized!")
+        rospy.on_shutdown(self.shutdownhook)
+
+        while (self.is_connected is None) or (not self.is_connected):
+            try:
+                rospy.loginfo("Waiting for MAVROS connection...")
+                time.sleep(1)
+            except rospy.ROSInterruptException:
+                break
+
+        rospy.loginfo("MAVROS connection status: " + str(self.is_connected))
+        rospy.loginfo("MAVROS armed status: " + str(self.is_armed))
+        rospy.loginfo("MAVROS initial mode: " + str(self.ini_mode))
+        time.sleep(1)
+
+    def shutdownhook(self):
+        self.ctrl_c = True
+
+    def state_callback(self, data):
+        self.is_connected = data.connected
+        self.is_armed = data.armed
+        self.ini_mode = data.mode
+
+    # def arm(self, status):
+    #     rospy.wait_for_service('/mavros/cmd/arming')
+    #     try:
+    #         if self.arming != status:	
+    #             arming_cl = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
+    #             response = arming_cl(value=status)
+    #             rospy.loginfo(response)
+    #             self.arming = status
+    #         else:
+    #             rospy.logwarn("Vessel is already armed with the desired status!")
+    #     except rospy.ServiceException as e:
+    #         rospy.logerr("Arming failed: %s" %e)
+
+    def arm(self, status):
+        rospy.wait_for_service('/mavros/cmd/arming')
+        try:
+            if self.arming != status:	
+                arming_client = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
+                arming_obj = CommandBoolRequest()
+                arming_obj.value = status
+                response = arming_client(arming_obj)
+                rospy.loginfo("Arming status: " + response)
+                self.arming = status
+            else:
+                rospy.logwarn("Vessel is already armed with the desired status!")
+        except rospy.ServiceException as e:
+            rospy.logerr("Arming failed: %s" %e)
+
+    # def change_mode(self, new_mode):
+    #     rospy.wait_for_service('/mavros/set_mode')
+    #     try:
+    #         if self.mode != new_mode:
+    #             change_mode = rospy.ServiceProxy('/mavros/set_mode', SetMode)
+    #             response = change_mode(custom_mode=new_mode)
+    #             rospy.loginfo(response)
+    #             self.mode = new_mode
+    #         else:
+    #             rospy.logwarn("Vessel is already in the desired mode!")
+    #     except rospy.ServiceException as e:
+    #         rospy.logerr("Mode change failed: %s" %e)
+
+    def change_mode(self, new_mode):
+        rospy.wait_for_service('/mavros/set_mode')
+        try:
+            if self.mode != new_mode:
+                change_mode_client = rospy.ServiceProxy('/mavros/set_mode', SetMode)
+                mode_obj = SetModeRequest()
+                mode_obj.custom_mode = new_mode
+                response = change_mode_client(mode_obj)
+                rospy.loginfo(response)
+                self.mode = new_mode
+            else:
+                rospy.logwarn("Vessel is already in the desired mode!")
+        except rospy.ServiceException as e:
+            rospy.logerr("Mode change failed: %s" %e)
 
     def gps_callback(self, msg):
         self.lat = msg.latitude
@@ -418,6 +504,22 @@ class apCommunication:
                 rospy.logerr("FAILURE: PUSHING WP!")		
         except rospy.ServiceException as e:
             rospy.logerr("Failed to send WayPoint: %s\n" %e)
+
+    def send_guided_wp(self, lat, lon, yaw=0):
+        self.guided_wp.latitude = lat
+        self.guided_wp.longitude = lon
+        self.guided_wp.altitude = 0
+        self.guided_wp.yaw = yaw
+        while not self.ctrl_c:
+            connections = self.pub_guided_wp.get_num_connections()
+            if connections > 0:
+                self.pub_guided_wp.publish(self.guided_wp)
+                rospy.loginfo("GUIDED waypoint published!")
+                self.wp_set = True
+                break
+            else:
+                rospy.logdebug("No subscribers to guided_wp yet, waiting to try again!")
+                time.sleep(0.1)
 
     def clear_waypoints(self):
         rospy.wait_for_service('mavros/mission/clear')
