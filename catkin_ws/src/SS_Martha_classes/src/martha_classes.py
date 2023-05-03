@@ -417,7 +417,7 @@ class apCommunication:
                 arming_obj = CommandBoolRequest()
                 arming_obj.value = status
                 response = arming_client(arming_obj)
-                rospy.loginfo("Arming status: " + response)
+                rospy.loginfo("Arming status: " + str(response))
                 self.arming = status
             else:
                 rospy.logwarn("Vessel is already armed with the desired status!")
@@ -445,7 +445,7 @@ class apCommunication:
                 mode_obj = SetModeRequest()
                 mode_obj.custom_mode = new_mode
                 response = change_mode_client(mode_obj)
-                rospy.loginfo(response)
+                rospy.loginfo(new_mode + " " + str(response))
                 self.mode = new_mode
             else:
                 rospy.logwarn("Vessel is already in the desired mode!")
