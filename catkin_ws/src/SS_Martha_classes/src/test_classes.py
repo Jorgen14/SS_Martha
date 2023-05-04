@@ -32,4 +32,3 @@ while not rospy.is_shutdown():
         
     except rospy.ROSInterruptException:
         break
-

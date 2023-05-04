@@ -514,21 +514,7 @@ class apCommunication:
                 rospy.logerr("FAILURE: PUSHING WP!")		
         except rospy.ServiceException as e:
             rospy.logerr("Failed to send WayPoint: %s\n" %e)
-    """
-    def pull_waypoint(self):
-        rospy.wait_for_service('mavros/mission/pull')
-        try:
-            response = rospy.ServiceProxy('mavros/mission/pull', WaypointPull)
-            status = response.success
-            self.wps = response.wp_recieved
-            if status:
-                rospy.loginfo("Waypoints: " + str())
-                rospy.logdebug("Waypoint successfully pulled!")
-            else:
-                rospy.logerr("FAILURE: PULLING WPS!")		
-        except rospy.ServiceException as e:
-            rospy.logerr("Failed to pull WayPoint: %s\n" %e)
-    """
+    
     def clear_waypoints(self):
         rospy.wait_for_service('mavros/mission/clear')
         try:
@@ -556,22 +542,22 @@ class apCommunication:
                 rospy.logdebug("No subscribers to guided_wp yet, waiting to try again!")
                 time.sleep(0.1)
         
-    def rotate_right(self, ang_vel):
+    def rotate_right(self):
         self.cmd_vel.linear.x = 0
         self.cmd_vel.linear.y = 0
         self.cmd_vel.linear.z = 0
         self.cmd_vel.angular.x = 0
         self.cmd_vel.angular.y = 0
-        self.cmd_vel.angular.z = ang_vel
+        self.cmd_vel.angular.z = np.radians(30)
         self.pub_vel.publish(self.cmd_vel)
 
-    def rotate_left(self, ang_vel):
+    def rotate_left(self):
         self.cmd_vel.linear.x = 0
         self.cmd_vel.linear.y = 0
         self.cmd_vel.linear.z = 0
         self.cmd_vel.angular.x = 0
         self.cmd_vel.angular.y = 0
-        self.cmd_vel.angular.z = -ang_vel
+        self.cmd_vel.angular.z = -np.radians(30)
         self.pub_vel.publish(self.cmd_vel)
     
     def move_forward(self, lin_vel):
