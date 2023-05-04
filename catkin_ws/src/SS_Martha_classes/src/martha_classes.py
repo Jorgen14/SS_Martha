@@ -337,11 +337,11 @@ class droneVision:
             else:
                 rospy.logerr("Depth is NaN, trying again...")
             
-        elif datetime.now() > self.wpTimer:
+        elif self.communication.waypoint_reached():
             self.communication.wp_set = False
         
         else:
-            rospy.loginfo("Waypoints set, waiting " + str(self.wpTimer - datetime.now()) + "s to set next waypoint.")
+            rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
             time.sleep(1)
 
 # ---------------------------------------------- ROS Communication ---------------------------------------------- #
@@ -467,6 +467,7 @@ class apCommunication:
         if self.mode == "AUTO" and (self.curr_seq == self.reached_seq):
             time.sleep(0.1)
             if self.curr_seq == self.reached_seq:
+                rospy.loginfo("AUTO waypoint reached!")
                 return True
             else:
                 return False
