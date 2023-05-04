@@ -357,7 +357,7 @@ class apCommunication:
         self.sub_state = rospy.Subscriber("/mavros/state", State, self.state_callback)
         self.sub_GPS = rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.gps_callback)
         self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
-        self.sub_vel = rospy.Subscriber("/mavros/global_position/gp_vel", TwistStamped, self.vel_callback)
+        self.sub_vel = rospy.Subscriber("/mavros/global_position/raw/gps_vel", TwistStamped, self.vel_callback)
         self.sub_wp_reached = rospy.Subscriber("/mavros/mission/reached", WaypointReached, self.wp_reached_callback)
         self.sub_wps = rospy.Subscriber("/mavros/mission/waypoints", WaypointList, self.wps_callback)
         
@@ -448,9 +448,9 @@ class apCommunication:
     def vel_callback(self, msg):
         self.lin_vel_x = msg.twist.linear.x
         self.lin_vel_y = msg.twist.linear.y
-        self.ang_vel_z = msg.twist.angular.z
-        rospy.logdebug("Drone linear velocity " + "forward: " + str(self.lin_vel_x) + ", " + "sideways: " + str(self.lin_vel_y))
-        rospy.logdebug("Drone angular velocity: " + str(self.ang_vel_z))
+        self.ang_vel_z = msg.twist.angular.y
+        rospy.loginfo("Linear velocity forward: " + str(self.lin_vel_y) + ", sideways: " + str(self.lin_vel_x))
+        rospy.loginfo("Angular velocity: " + str(self.ang_vel_z))
 
     def wps_callback(self, msg):
         self.curr_seq = msg.current_seq
@@ -460,8 +460,8 @@ class apCommunication:
     def wp_reached_callback(self, msg):
         self.reached_seq = msg.wp_seq
         self.wp_reached = True 
-        rospy.logwarn("Waypoint reached!")
-        rospy.logdebug("Waypoint reached: " + str(self.wp_reached))
+        rospy.loginfo("Waypoint reached!")
+        rospy.logdebug("Waypoint reached: " + str(self.reached_seq))
 
     def auto_wp_reached(self): 
         if self.mode == "AUTO" and (self.curr_seq == self.reached_seq):

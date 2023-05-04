@@ -60,31 +60,30 @@ while not rospy.is_shutdown():
             
             MarthaCom.change_mode("GUIDED")
             MarthaCom.clear_waypoints()
-            MarthaCom.make_waypoint(-35.363302, 149.165204, curr=True)
-            MarthaCom.make_waypoint(-35.362973, 149.163109)
+            MarthaCom.make_waypoint(0, 0, cmd=20)
+            #MarthaCom.make_waypoint(-35.363302, 149.165204, curr=True)
+            #MarthaCom.make_waypoint(-35.362973, 149.163109)
             #MarthaCom.make_waypoint(-35.363824, 149.163959)
             #MarthaCom.make_waypoint(-35.363302, 149.165204)
             MarthaCom.send_waypoint()
             MarthaCom.change_mode("AUTO")
             time.sleep(1)
             #wpTimer = datetime.now() + timedelta(seconds=20)
-            go_next = True 
-            #done = True
+            #go_next = True 
+            done = True
         elif MarthaCom.waypoint_reached():
             rospy.loginfo("Third round!")
             MarthaCom.change_mode("GUIDED")
             MarthaCom.clear_waypoints()
-            MarthaCom.make_waypoint(-35.363824, 149.163959, curr=True)
-            MarthaCom.make_waypoint(-35.363302, 149.165204)
+            MarthaCom.make_waypoint(0, 0, cmd=20)
+            #MarthaCom.make_waypoint(-35.363824, 149.163959, curr=True)
+            #MarthaCom.make_waypoint(-35.363302, 149.165204)
             MarthaCom.send_waypoint()
             MarthaCom.change_mode("AUTO")
             time.sleep(1)
         else:
             pass
 
-        rospy.loginfo("Current sequence: " + str(MarthaCom.curr_seq))
-        rospy.loginfo("Sequence reached: " + str(MarthaCom.reached_seq))
-        rospy.loginfo("Waypoint reached: " + str(MarthaCom.wp_reached))
         scriptTime = datetime.now() - startTime
         rospy.loginfo("Script time: " + str(scriptTime))
         time.sleep(0.5)
