@@ -4,7 +4,7 @@
 	<include file="$(find mavros)/launch/apm.launch"/>
 
 	<node pkg="SS_Martha_classes"
-	  type="test_classes.py"
+	  type="test_ros.py"
 	  name="TestNode"
 	  output="screen">
 	</node>
