@@ -19,6 +19,7 @@ class droneVision:
     out_dist = 1.0 # meters to get clear of buoy gate
     wp_dist_from_buoy = 1.5 # meters to set waypoint from yellow buoy
     no_buoy_dist = 2.0 # if no buoys detected move x_meters to look for buoys
+    sg_no_buoy_dist = 5.0 # Same as above but for speed gate
     search_max_iter = 3 # maximum number of times to search for buoys
 
     def __init__(self, DEBUG_CAM=False):
@@ -29,6 +30,12 @@ class droneVision:
 
         self.wp_lat = None
         self.wp_lon = None
+        self.start_lat = None
+        self.start_lon = None
+
+        self.yellow_set = False
+        self.gate_set = False
+        self.mission_complete = False
         
         self.start_time = datetime.now() + timedelta(seconds=60*60)
         self.stb_clear = False
@@ -296,7 +303,7 @@ class droneVision:
         else:
             return False
 
-    def obstacle_channel_gate(self):
+    def gate_wp(self):
         self.wp_lat = round((self.closest_GPS[0] + self.second_closest_GPS[0]) / 2, self.GPS_round)
         self.wp_lon = round((self.closest_GPS[1] + self.second_closest_GPS[1]) / 2, self.GPS_round)
 
@@ -312,18 +319,35 @@ class droneVision:
     def obstacle_channel_yellow_buoy(self):
         drone_buoy_bearing = self.two_points_bearing(self.communication.lat, self.communication.lon, self.closest_GPS[0], self.closest_GPS[1])
         
-        if self.closest_bearing < 0:
-            self.wp_dist_from_buoy *= -1
-        else:
-            self.wp_dist_from_buoy *= 1
-        
         dist_to_wp = np.sqrt(self.closest_dist**2 + self.wp_dist_from_buoy**2)
-        angle_buoy_wp = np.degrees(np.arctan2(self.wp_dist_from_buoy, self.closest_dist))
+        if self.closest_bearing < 0:
+            angle_buoy_wp = -np.degrees(np.arctan2(self.wp_dist_from_buoy, self.closest_dist))
+        else:
+            angle_buoy_wp = np.degrees(np.arctan2(self.wp_dist_from_buoy, self.closest_dist))
         self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon = self.dist_to_GPS_cords(dist_to_wp, drone_buoy_bearing + angle_buoy_wp, self.communication.lat, self.communication.lon)
 
         rospy.loginfo("Navigating around yellow_buoy, waypoint set at: " + "(" +  str(self.wp_yellow_buoy_lat) + ", " + str(self.wp_yellow_buoy_lon) + ")")
     
-    def nav_channel_waypoint(self):
+    def speed_gate_yellow_buoy(self):
+        drone_buoy_bearing = self.two_points_bearing(self.communication.lat, self.communication.lon, self.closest_GPS[0], self.closest_GPS[1])
+
+        if self.closest_bearing < 0: # Decide which side of the buoy to go around 
+            x = -1
+        else:
+            x = 1
+        
+        dist_to_wp_1 = np.sqrt(self.closest_dist**2 + self.wp_dist_from_buoy**2)
+        angle_buoy_wp_1 = x*np.degrees(np.arctan2(self.wp_dist_from_buoy, self.closest_dist))
+        self.yellow_buoy_lat_1, self.yellow_buoy_lon_1 = self.dist_to_GPS_cords(dist_to_wp_1, drone_buoy_bearing + angle_buoy_wp_1, self.communication.lat, self.communication.lon)
+
+        dist_to_wp_2 = self.closest_dist + self.wp_dist_from_buoy
+        self.yellow_buoy_lat_2, self.yellow_buoy_lon_2 = self.dist_to_GPS_cords(dist_to_wp_2, drone_buoy_bearing, self.communication.lat, self.communication.lon)
+
+        dist_to_wp_3 = np.sqrt(self.closest_dist**2 + (-self.wp_dist_from_buoy**2))
+        angle_buoy_wp_3 = -x*np.degrees(np.arctan2(self.wp_dist_from_buoy, self.closest_dist))
+        self.yellow_buoy_lat_3, self.yellow_buoy_lon_3 = self.dist_to_GPS_cords(dist_to_wp_3, drone_buoy_bearing + angle_buoy_wp_3, self.communication.lat, self.communication.lon)
+
+    def nav_channel_mission(self):
         if not self.communication.wp_set:
             self.detection_results()
             if not self.depth_is_nan:
@@ -332,7 +356,7 @@ class droneVision:
                 self.buoy_GPS_loc()
                 if self.check_buoy_gate():
                     if self.check_gate_orientation():
-                        self.obstacle_channel_gate()
+                        self.gate_wp()
                         self.communication.change_mode("GUIDED")
                         self.communication.clear_waypoints()
                         self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
@@ -418,7 +442,69 @@ class droneVision:
         
         else:
             rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
-            time.sleep(1)
+            time.sleep(0.2)
+
+    def speed_gate_mission(self):
+        if self.gate_set and not self.yellow_set and not self.communication.wp_set:
+            self.detection_results()
+            if not self.depth_is_nan:
+                self.get_closest_buoy() 
+                self.buoy_GPS_loc()
+                if self.closest_color == "yellow_buoy":
+                    self.speed_gate_yellow_buoy()
+                    self.communication.clear_waypoints()
+                    self.communication.make_waypoint(self.yellow_buoy_lat_1, self.yellow_buoy_lon_1, curr=True) 
+                    self.communication.make_waypoint(self.yellow_buoy_lat_2, self.yellow_buoy_lon_2)
+                    self.communication.make_waypoint(self.yellow_buoy_lat_3, self.yellow_buoy_lon_3)
+                    self.communication.make_waypoint(self.start_lat, self.start_lon)
+                    self.communication.send_waypoint()
+                    self.communication.change_mode("AUTO")
+                    self.yellow_set = True
+                else:
+                    self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.sg_no_buoy_dist, self.communication.heading, self.communication.lat, self.communication.lon) 
+                    self.communication.change_mode("GUIDED")
+                    self.communication.send_guided_wp(self.wp_lat, self.wp_lon)
+
+            else:
+                rospy.logerr("Depth is NaN, trying again...")
+            
+        elif not self.gate_set:
+            self.detection_results()
+            if not self.depth_is_nan:
+                self.get_closest_buoy() 
+                self.get_2nd_closest_buoy()
+                self.buoy_GPS_loc()
+                try:
+                    self.gate_wp()
+                    self.communication.change_mode("GUIDED")
+                    self.communication.clear_waypoints()
+                    self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+                    self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
+                    self.communication.send_waypoint()
+                    self.communication.change_mode("AUTO")
+                    self.start_lat = self.wp_lat
+                    self.start_lon = self.wp_lon
+                    self.gate_set = True
+                except TypeError:
+                    rospy.logerr("No gate detected, trying again...")
+            else:
+                rospy.logerr("Depth is NaN, trying again...")
+
+        elif self.communication.waypoint_reached() and self.yellow_set:
+            self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.no_buoy_dist, self.communication.heading, self.communication.lat, self.communication.lon) 
+            self.communication.change_mode("GUIDED")
+            self.communication.send_guided_wp(self.wp_lat, self.wp_lon)
+            self.mission_complete = True
+
+        elif self.communication.waypoint_reached() and self.mission_complete:
+            self.communication.RTL()
+        
+        elif self.communication.waypoint_reached():
+            self.communication.wp_set = False
+        
+        else:
+            rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
+            time.sleep(0.2)
 
 # ---------------------------------------------- ROS Communication ---------------------------------------------- #
 
@@ -614,7 +700,6 @@ class apCommunication:
                 break
             else:
                 rospy.logdebug("No subscribers to guided_wp yet, waiting to try again!")
-                time.sleep(0.1)
 
     def RTL(self):
         self.change_mode("GUIDED")
