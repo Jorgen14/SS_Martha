@@ -449,8 +449,8 @@ class apCommunication:
         self.lin_vel_x = msg.twist.linear.x
         self.lin_vel_y = msg.twist.linear.y
         self.ang_vel_z = msg.twist.angular.y
-        rospy.loginfo("Linear velocity forward: " + str(self.lin_vel_y) + ", sideways: " + str(self.lin_vel_x))
-        rospy.loginfo("Angular velocity: " + str(self.ang_vel_z))
+        rospy.logdebug("Linear velocity forward: " + str(self.lin_vel_y) + ", sideways: " + str(self.lin_vel_x))
+        rospy.logdebug("Angular velocity: " + str(self.ang_vel_z))
 
     def wps_callback(self, msg):
         self.curr_seq = msg.current_seq
