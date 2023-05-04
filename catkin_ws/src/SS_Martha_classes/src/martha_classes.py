@@ -284,9 +284,9 @@ class droneVision:
         drone_buoy_bearing = self.two_points_bearing(self.communication.lat, self.communication.lon, self.closest_GPS[0], self.closest_GPS[1])
         
         if self.closest_bearing < 0:
-            self.wp_dist_from_buoy *= -1
+            self.wp_dist_from_buoy *= -2
         else:
-            self.wp_dist_from_buoy *= 1
+            self.wp_dist_from_buoy *= 2
         
         dist_to_wp = np.sqrt(self.closest_dist**2 + self.wp_dist_from_buoy**2)
         angle_buoy_wp = np.degrees(np.arctan2(self.wp_dist_from_buoy, self.closest_dist))
