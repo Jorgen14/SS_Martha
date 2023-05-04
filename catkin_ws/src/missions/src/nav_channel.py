@@ -13,7 +13,7 @@ else:
 
 rate = rospy.Rate(1)   
 
-#MarthaVision = droneVision(DEBUG_CAM=False)
+MarthaVision = droneVision(DEBUG_CAM=False)
 
 MarthaCom = apCommunication()
 
@@ -25,8 +25,7 @@ if not MarthaCom.is_armed:
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:          
-        #MarthaVision.nav_channel_mission()
-        rospy.loginfo(str(MarthaCom.heading))
+        MarthaVision.nav_channel_mission()
         scriptTime = datetime.now() - startTime
         rospy.loginfo("Script time: " + str(scriptTime))
         rate.sleep()
