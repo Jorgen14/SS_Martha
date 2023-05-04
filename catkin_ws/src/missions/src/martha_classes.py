@@ -484,6 +484,8 @@ class droneVision:
                     self.communication.change_mode("AUTO")
                     self.start_lat = self.wp_lat
                     self.start_lon = self.wp_lon
+                    self.start_lat_out_rev = 2*self.start_lat - self.wp_lat_out
+                    self.start_lon_out_rev = 2*self.start_lon - self.wp_lon_out
                     self.gate_set = True
                 except TypeError:
                     rospy.logerr("No gate detected, trying again...")
@@ -491,14 +493,9 @@ class droneVision:
                 rospy.logerr("Depth is NaN, trying again...")
 
         elif self.communication.waypoint_reached() and self.yellow_set:
-            self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.no_buoy_dist, self.communication.heading, self.communication.lat, self.communication.lon) 
-            self.communication.change_mode("GUIDED")
-            self.communication.send_guided_wp(self.wp_lat, self.wp_lon)
-            self.mission_complete = True
-
-        elif self.communication.waypoint_reached() and self.mission_complete:
+            rospy.loginfo("Mission complete, returning home.")
             self.communication.RTL()
-        
+            
         elif self.communication.waypoint_reached():
             self.communication.wp_set = False
         
