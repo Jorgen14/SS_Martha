@@ -31,4 +31,5 @@ while not rospy.is_shutdown():
         rate.sleep()
         
     except rospy.ROSInterruptException:
+        MarthaCom.RTL()
         break
