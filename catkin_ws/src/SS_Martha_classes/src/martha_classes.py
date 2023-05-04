@@ -561,14 +561,17 @@ class apCommunication:
         self.pub_vel.publish(self.cmd_vel)
     
     def move_forward(self, lin_vel):
-        self.cmd_vel.linear.x = lin_vel
-        self.cmd_vel.linear.y = 0
-        self.cmd_vel.linear.z = 0
-        self.cmd_vel.angular.x = 0
-        self.cmd_vel.angular.y = 0
+        self.cmd_vel.linear.x = 0
+        self.cmd_vel.linear.y = lin_vel
         self.cmd_vel.angular.z = 0
         self.pub_vel.publish(self.cmd_vel)
-    
+   
+    def move_sideways(self, lin_vel):
+        self.cmd_vel.linear.x = lin_vel
+        self.cmd_vel.linear.y = 0
+        self.cmd_vel.angular.z = 0
+        self.pub_vel.publish(self.cmd_vel)
+
     def stop(self):
         self.cmd_vel.linear.x = 0
         self.cmd_vel.linear.y = 0
@@ -576,4 +579,12 @@ class apCommunication:
         self.cmd_vel.angular.x = 0
         self.cmd_vel.angular.y = 0
         self.cmd_vel.angular.z = 0
-        self.pub_vel.publish(self.cmd_vel)
+        while not self.ctrl_c:
+            connections = self.pub_vel.get_num_connections()
+            if connections > 0:
+                self.pub_vel.publish(self.cmd_vel)
+                rospy.loginfo("Stopping motors")
+                break
+            else:
+                rospy.logdebug("No subscribers to pub_vel yet, trying again...")
+

@@ -15,6 +15,9 @@ else:
 
 MarthaCom = apCommunication()
 
+MarthaCom.arm(True)
+MarthaCom.change_mode("GUIDED")
+
 MarthaCom.clear_waypoints()
 
 rate = rospy.Rate(1)  
@@ -25,53 +28,68 @@ done = False
 
 if not MarthaCom.is_armed:
     MarthaCom.arm(True)
-
+"""
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:
         if first:
-            MarthaCom.rotate_right()
+            MarthaCom.rotate_left()
+            rospy.loginfo("Rotating left")
             if datetime.now() > wpTimer:
+                rospy.loginfo("First timer elapsed")
+                MarthaCom.stop()
                 first = False
                 second = True
                 wpTimer = datetime.now() + timedelta(seconds=10)
         elif second:
-            MarthaCom.rotate_left()
+            MarthaCom.rotate_right()
+            rospy.loginfo("Rotating right")
             if datetime.now() > wpTimer:
+                rospy.loginfo("Second timer elapsed")
                 second = False
                 done = True
-        elif wpTimer > datetime.now():
+        elif done:
+            MarthaCom.stop()
+            rospy.loginfo("Stopping")
+            MarthaCom.arm(False)
             break
         else:
             time.sleep(0.5)
-        scriptTime = datetime.now() - startTime
-        rospy.loginfo("Script time: " + str(scriptTime))
+        #scriptTime = datetime.now() - startTime
+        #rospy.loginfo("Script time: " + str(scriptTime))
         rate.sleep()
         
     except rospy.ROSInterruptException:
         break
 
-# while not rospy.is_shutdown():
-#     startTime = datetime.now()
-#     try:
-#         if first:
-#             MarthaCom.move_forward()
-#             if datetime.now() > wpTimer:
-#                 first = False
-#                 second = True
-#                 wpTimer = datetime.now() + timedelta(seconds=10)
-#         elif second:
-#             MarthaCom.stop()
-#             if datetime.now() > wpTimer:
-#                 second = False
-#                 done = True
-#         elif wpTimer > datetime.now():
-#             break
-#         else:
-#             time.sleep(0.5)
-#         scriptTime = datetime.now() - startTime
-#         rospy.loginfo("Script time: " + str(scriptTime))
-#         rate.sleep()
+"""
+
+while not rospy.is_shutdown():
+     startTime = datetime.now()
+     try:
+         if first:
+             MarthaCom.move_forward(1.0)
+             rospy.loginfo("First!")
+             if datetime.now() > wpTimer:
+                 first = False
+                 second = True
+                 wpTimer = datetime.now() + timedelta(seconds=10)
+         elif second:
+             MarthaCom.move_sideways(1.0)
+             rospy.loginfo("Second!")
+             if datetime.now() > wpTimer:
+                 second = False
+                 done = True
+         elif done:
+             MarthaCom.stop()
+             MarthaCom.arm(False)
+             break
+         else:
+             time.sleep(0.5)
+         scriptTime = datetime.now() - startTime
+         rospy.loginfo("Script time: " + str(scriptTime))
+         rate.sleep()
         
-#     except rospy.ROSInterruptException:
-#         break
+     except rospy.ROSInterruptException:
+         break
+
