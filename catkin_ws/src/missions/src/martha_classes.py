@@ -20,6 +20,7 @@ class droneVision:
     no_buoy_dist = 2.0 # if no buoys detected move x_meters to look for buoys
     sg_no_buoy_dist = 5.0 # Same as above but for speed gate
     search_max_iter = 3 # maximum number of times to search for buoys
+    look_degs = 45 # Angle for looking to both sides in degrees
 
     def __init__(self, DEBUG_CAM=False):
         self.DEBUG_CAM = DEBUG_CAM
@@ -123,12 +124,12 @@ class droneVision:
                     if not self.stb_clear:
                         rospy.loginfo("No detections, turning to starboard to check again.")
                         self.communication.change_mode("GUIDED")
-                        self.communication.rotate_x_deg(self.communication.look_degs, 20)
+                        self.communication.rotate_x_deg(self.look_degs, 20)
                         self.stb_clear = True
                     elif not self.port_clear:
                         rospy.loginfo("No detections, turning to port to check again.")
                         self.communication.change_mode("GUIDED")
-                        self.communication.rotate_x_deg(-2*self.communication.look_degs, -20)
+                        self.communication.rotate_x_deg(-2*self.look_degs, -20)
                         self.port_clear = True
                     elif self.im_lost():
                         rospy.logerr("I'm lost :(")
@@ -158,6 +159,8 @@ class droneVision:
 
         elif self.timer_reached():
             rospy.loginfo("Timer reached, looking again.")
+            self.communication.clear_guided_wp()
+            self.communication.clear_waypoints()
             self.communication.wp_set = False
         
         else:
@@ -512,7 +515,6 @@ class droneVision:
 class apCommunication:
 
     max_speed = 1.6 # Vessel max speed in m/s
-    look_degs = 60 # Angle for looking to both sides in degrees
 
     def __init__(self): 
 
@@ -705,6 +707,10 @@ class apCommunication:
             else:
                 rospy.logdebug("No subscribers to guided_wp yet, waiting to try again!")
 
+    def clear_guided_wp(self):
+        self.change_mode("MANUAL")
+        self.change_mode("GUIDED")
+
     def RTL(self):
         self.change_mode("GUIDED")
         self.clear_waypoints()
@@ -726,7 +732,6 @@ class apCommunication:
                 self.rotate(rate)
                 time.sleep(0.1)
             rospy.logdebug("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg))
-
         self.stop()
         
     def rotate(self, deg_s): # Positive deg_s is starboard, negative is port

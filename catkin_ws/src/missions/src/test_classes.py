@@ -13,7 +13,11 @@ else:
 
 rate = rospy.Rate(1)   
 
-rospy.loginfo("Starting testing!")
+first = False
+second = False
+third = False
+
+start_timer = datetime.now() + timedelta(seconds=125/4)
 
 #MarthaVision = droneVision(DEBUG_CAM=False)
 
@@ -28,11 +32,34 @@ MarthaCom.change_mode("GUIDED")
 
 while not rospy.is_shutdown():
     startTime = datetime.now()
-    try:          
-        #MarthaCom.rotate_x_deg(30, -10)
-        #MarthaCom.move_forward(0.8)
-        MarthaCom.move_sideways(0.8)
-        time.sleep(0.2)
+    try:  
+        """
+        if not first:
+            MarthaCom.send_guided_wp(-35.36334, 149.16524)
+            first = True
+        elif MarthaCom.waypoint_reached():
+            break
+
+        """        
+        if not first:
+            MarthaCom.send_guided_wp(-35.36222, 149.16509)
+            #MarthaCom.send_guided_wp(-35.36334, 149.16524)
+            start_timer = datetime.now() + timedelta(seconds=15)
+            first = True
+        elif datetime.now() >= start_timer and not second:
+            MarthaCom.clear_guided_wp()
+            start_timer = datetime.now() + timedelta(seconds=5)
+            second = True
+        elif datetime.now() >= start_timer and not third:
+            #MarthaCom.send_guided_wp(-35.36222, 149.16509)
+            MarthaCom.send_guided_wp(-35.36334, 149.16524)
+            third = False
+        elif datetime.now() >= start_timer and first and second and third: 
+            break
+        else:
+            rospy.loginfo("Waiting...")
+            time.sleep(0.2)
+        
         scriptTime = datetime.now() - startTime
         rospy.loginfo("Script time: " + str(scriptTime))
         rate.sleep()
@@ -42,3 +69,8 @@ while not rospy.is_shutdown():
         break
 
 rospy.loginfo("Done!")
+
+
+#MarthaCom.rotate_x_deg(30, -10)
+#MarthaCom.move_forward(0.8)
+#MarthaCom.move_sideways(0.8)
