@@ -7,10 +7,9 @@ from datetime import datetime, timedelta
 import rospy
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from std_msgs.msg import Float64
-#from std_msgs.srv import Empty, EmptyRequest
 from geometry_msgs.msg import Twist, TwistStamped
 from mavros_msgs.msg import Waypoint, WaypointReached, WaypointList, State, GlobalPositionTarget
-from mavros_msgs.srv import WaypointPush, WaypointPull, WaypointClear, CommandBool, CommandBoolRequest, SetMode, SetModeRequest
+from mavros_msgs.srv import WaypointPush, WaypointClear, CommandBool, CommandBoolRequest, SetMode, SetModeRequest
 
 class droneVision:
 
@@ -28,8 +27,8 @@ class droneVision:
         self.img_array = None
         self.depth_img = None
 
-        self.wp_lat = None
-        self.wp_lon = None
+        self.wp_lat_out = None
+        self.wp_lon_out = None
         self.start_lat = None
         self.start_lon = None
 
@@ -66,6 +65,165 @@ class droneVision:
         rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape)) 
         
         rospy.loginfo("Camera initialized!")
+        time.sleep(2)
+
+    def nav_channel_mission(self):
+        if not self.communication.wp_set:
+            self.detection_results()
+            if not self.depth_is_nan:
+                self.get_closest_buoy() 
+                self.get_2nd_closest_buoy()
+                self.buoy_GPS_loc()
+                if self.check_buoy_gate():
+                    if self.check_gate_orientation():
+                        self.gate_wp()
+                        self.communication.change_mode("GUIDED")
+                        self.communication.clear_waypoints()
+                        self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+                        self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
+                        self.communication.send_waypoint()
+                        self.communication.change_mode("AUTO")
+                        self.start_timer(self.closest_dist / self.communication.max_speed + 5)
+                        self.reset_search_vars()
+                    else:
+                        rospy.loginfo("Buoy gate detected, but not in the right orientation.")
+                        self.communication.change_mode("GUIDED")
+                        self.communication.rotate_x_deg(180, 60)    
+                        self.reset_search_vars()
+
+                elif self.closest_color == "yellow_buoy" and self.second_is_none:
+                    self.obstacle_channel_yellow_buoy()
+                    self.communication.change_mode("GUIDED")
+                    self.communication.send_guided_wp(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon)
+                    self.start_timer(self.closest_dist / self.communication.max_speed + 5)
+                    self.reset_search_vars()
+
+                elif self.closest_color == "yellow_buoy":
+                    if self.check_rel_dist() and not self.rel_dist_err:
+                        rospy.loginfo("Yellow buoy detected, but suspiciously close to other buoy.")
+                        self.communication.change_mode("GUIDED")
+                        self.communication.send_guided_wp(self.closest_GPS[0], self.closest_GPS[1])
+                        self.start_timer((self.closest_dist / self.communication.max_speed) / 2)
+                        self.reset_search_vars()
+                    else:
+                        self.obstacle_channel_yellow_buoy()
+                        self.communication.change_mode("GUIDED")
+                        self.communication.send_guided_wp(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon)
+                        self.start_timer(self.closest_dist / self.communication.max_speed + 5)
+                        self.reset_search_vars()
+
+                elif (self.closest_color == "red_buoy" or self.closest_color == "green_buoy") and self.second_is_none:
+                    rospy.logwarn("Only one non yellow buoy detected, moving closer to get a better look.")
+                    self.communication.change_mode("GUIDED")
+                    self.communication.send_guided_wp(self.closest_GPS[0], self.closest_GPS[1])
+                    self.start_timer((self.closest_dist / self.communication.max_speed) / 2)
+                    self.reset_search_vars()
+
+                else:
+                    if not self.stb_clear:
+                        rospy.loginfo("No detections, turning to starboard to check again.")
+                        self.communication.change_mode("GUIDED")
+                        self.communication.rotate_x_deg(self.communication.look_degs, 20)
+                        self.stb_clear = True
+                    elif not self.port_clear:
+                        rospy.loginfo("No detections, turning to port to check again.")
+                        self.communication.change_mode("GUIDED")
+                        self.communication.rotate_x_deg(-2*self.communication.look_degs, 20)
+                        self.port_clear = True
+                    elif self.im_lost():
+                        rospy.logerr("I'm lost :(")
+                        if not self.wp_lat_out is None and not self.wp_lon_out is None:
+                            rospy.logwarn("Returning to last gate exit.")
+                            self.communication.change_mode("GUIDED")
+                            self.communication.send_guided_wp(self.wp_lat_out, self.wp_lon_out)
+                            self.reset_search_vars()
+                        else:
+                            rospy.logerr("I don't know where I am, pls help.")
+                            self.communication.change_mode("GUIDED")
+                            self.communication.rotate_x_deg(90, 45)
+                    else:
+                        rospy.logwarn("No detections, moving " + str(self.no_buoy_dist) + "m forward to check again.")
+                        self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.no_buoy_dist, self.communication.heading, self.communication.lat, self.communication.lon) 
+                        self.communication.change_mode("GUIDED")
+                        self.communication.send_guided_wp(self.wp_lat, self.wp_lon)
+                        self.stb_clear = False
+                        self.port_clear = False
+                        self.search_iter += 1
+
+            else:
+                rospy.logerr("Depth is NaN, trying again...")
+            
+        elif self.communication.waypoint_reached():
+            self.communication.wp_set = False
+
+        elif self.timer_reached():
+            rospy.loginfo("Timer reached, looking again.")
+            self.communication.wp_set = False
+        
+        else:
+            rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
+            time.sleep(0.2)
+
+    def speed_gate_mission(self):
+        if self.gate_set and not self.yellow_set and not self.communication.wp_set:
+            self.detection_results()
+            if not self.depth_is_nan:
+                self.get_closest_buoy() 
+                self.buoy_GPS_loc()
+                if self.closest_color == "yellow_buoy":
+                    self.speed_gate_yellow_buoy()
+                    self.communication.clear_waypoints()
+                    self.communication.make_waypoint(self.yellow_buoy_lat_1, self.yellow_buoy_lon_1, curr=True) 
+                    self.communication.make_waypoint(self.yellow_buoy_lat_2, self.yellow_buoy_lon_2)
+                    self.communication.make_waypoint(self.yellow_buoy_lat_3, self.yellow_buoy_lon_3)
+                    self.communication.make_waypoint(self.start_lat, self.start_lon)
+                    self.communication.make_waypoint(self.start_lat_out_ret, self.start_lon_out_ret)
+                    self.communication.send_waypoint()
+                    self.communication.change_mode("AUTO")
+                    self.yellow_set = True
+                else:
+                    self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.sg_no_buoy_dist, self.communication.heading, self.communication.lat, self.communication.lon) 
+                    self.communication.change_mode("GUIDED")
+                    self.communication.send_guided_wp(self.wp_lat, self.wp_lon)
+
+            else:
+                rospy.logerr("Depth is NaN, trying again...")
+            
+        elif not self.gate_set:
+            self.detection_results()
+            if not self.depth_is_nan:
+                self.get_closest_buoy() 
+                self.get_2nd_closest_buoy()
+                self.buoy_GPS_loc()
+                try:
+                    self.gate_wp()
+                    self.communication.change_mode("GUIDED")
+                    self.communication.clear_waypoints()
+                    self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+                    self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
+                    self.communication.send_waypoint()
+                    self.communication.change_mode("AUTO")
+                    self.start_lat = self.wp_lat
+                    self.start_lon = self.wp_lon
+                    self.start_lat_out_ret = 2*self.start_lat - self.wp_lat_out
+                    self.start_lon_out_ret = 2*self.start_lon - self.wp_lon_out
+                    self.gate_set = True
+                except TypeError:
+                    rospy.logerr("No gate detected, trying again...")
+            else:
+                rospy.logerr("Depth is NaN, trying again...")
+
+        elif self.communication.waypoint_reached() and self.yellow_set:
+            rospy.loginfo("Mission complete, returning home.")
+            self.communication.RTL()
+            self.mission_complete = True
+            
+        elif self.communication.waypoint_reached():
+            self.communication.wp_set = False
+        
+        else:
+            rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
+            time.sleep(0.2)
 
     def image_callback(self, msg):
         img_left = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
@@ -268,7 +426,7 @@ class droneVision:
         return two_points_bearing
     
     @staticmethod
-    def hdg_rel_to_bearing(_bearing, rel_angle, drone_hdg):
+    def hdg_rel_to_bearing(_bearing, rel_angle, drone_hdg): # _bearing needs to be in range [-180, 180]
         out_heading = None
         if (_bearing >= 0 and _bearing < 90) or (_bearing < 0 and _bearing >= -90):
             if (drone_hdg >= 270 and drone_hdg < 360) or (drone_hdg >= 0 and drone_hdg < 90):
@@ -280,7 +438,8 @@ class droneVision:
                 out_heading = _bearing + rel_angle
             else:
                 out_heading = _bearing - rel_angle
-
+        else:
+            rospy.logerr("Error in hdg_rel_to_bearing! _bearing: " + str(_bearing) + " drone_hdg: " + str(drone_hdg) + " out_heading: " + str(out_heading) + " rel_angle: " + str(rel_angle))
         return out_heading
     
     def reset_search_vars(self):
@@ -347,162 +506,6 @@ class droneVision:
         angle_buoy_wp_3 = -x*np.degrees(np.arctan2(self.wp_dist_from_buoy, self.closest_dist))
         self.yellow_buoy_lat_3, self.yellow_buoy_lon_3 = self.dist_to_GPS_cords(dist_to_wp_3, drone_buoy_bearing + angle_buoy_wp_3, self.communication.lat, self.communication.lon)
 
-    def nav_channel_mission(self):
-        if not self.communication.wp_set:
-            self.detection_results()
-            if not self.depth_is_nan:
-                self.get_closest_buoy() 
-                self.get_2nd_closest_buoy()
-                self.buoy_GPS_loc()
-                if self.check_buoy_gate():
-                    if self.check_gate_orientation():
-                        self.gate_wp()
-                        self.communication.change_mode("GUIDED")
-                        self.communication.clear_waypoints()
-                        self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
-                        self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
-                        self.communication.send_waypoint()
-                        self.communication.change_mode("AUTO")
-                        self.start_timer(self.closest_dist / self.communication.max_speed + 5)
-                        self.reset_search_vars()
-                    else:
-                        rospy.loginfo("Buoy gate detected, but not in the right orientation.")
-                        self.communication.change_mode("GUIDED")
-                        self.communication.rotate_x_deg(180, 60)    
-                        self.reset_search_vars()
-
-                elif self.closest_color == "yellow_buoy" and self.second_is_none:
-                    self.obstacle_channel_yellow_buoy()
-                    self.communication.change_mode("GUIDED")
-                    self.communication.send_guided_wp(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon)
-                    self.start_timer(self.closest_dist / self.communication.max_speed + 5)
-                    self.reset_search_vars()
-
-                elif self.closest_color == "yellow_buoy":
-                    if self.check_rel_dist() and not self.rel_dist_err:
-                        rospy.loginfo("Yellow buoy detected, but suspiciously close to other buoy.")
-                        self.communication.change_mode("GUIDED")
-                        self.communication.send_guided_wp(self.closest_GPS[0], self.closest_GPS[1])
-                        self.start_timer((self.closest_dist / self.communication.max_speed) / 2)
-                        self.reset_search_vars()
-                    else:
-                        self.obstacle_channel_yellow_buoy()
-                        self.communication.change_mode("GUIDED")
-                        self.communication.send_guided_wp(self.wp_yellow_buoy_lat, self.wp_yellow_buoy_lon)
-                        self.start_timer(self.closest_dist / self.communication.max_speed + 5)
-                        self.reset_search_vars()
-
-                elif (self.closest_color == "red_buoy" or self.closest_color == "green_buoy") and self.second_is_none:
-                    rospy.logwarn("Only one non yellow buoy detected, moving closer to get a better look.")
-                    self.communication.change_mode("GUIDED")
-                    self.communication.send_guided_wp(self.closest_GPS[0], self.closest_GPS[1])
-                    self.start_timer((self.closest_dist / self.communication.max_speed) / 2)
-                    self.reset_search_vars()
-
-                else:
-                    if not self.stb_clear:
-                        rospy.loginfo("No detections, turning to starboard to check again.")
-                        self.communication.change_mode("GUIDED")
-                        self.communication.rotate_x_deg(self.communication.look_degs, 20)
-                        self.stb_clear = True
-                    elif not self.port_clear:
-                        rospy.loginfo("No detections, turning to port to check again.")
-                        self.communication.change_mode("GUIDED")
-                        self.communication.rotate_x_deg(-2*self.communication.look_degs, 20)
-                        self.port_clear = True
-                    elif self.im_lost():
-                        rospy.logerr("I'm lost :(")
-                        if not self.wp_lat is None or not self.wp_lon is None:
-                            rospy.logwarn("Returning to last gate exit.")
-                            self.communication.change_mode("GUIDED")
-                            self.communication.send_guided_wp(self.wp_lat_out, self.wp_lon_out)
-                            self.reset_search_vars()
-                        else:
-                            rospy.logerr("I don't know where I am, pls help.")
-                            self.communication.change_mode("GUIDED")
-                            self.communication.rotate_x_deg(90, 45)
-                    else:
-                        rospy.logwarn("No detections, moving " + str(self.no_buoy_dist) + "m forward to check again.")
-                        self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.no_buoy_dist, self.communication.heading, self.communication.lat, self.communication.lon) 
-                        self.communication.change_mode("GUIDED")
-                        self.communication.send_guided_wp(self.wp_lat, self.wp_lon)
-                        self.stb_clear = False
-                        self.port_clear = False
-                        self.search_iter += 1
-
-            else:
-                rospy.logerr("Depth is NaN, trying again...")
-            
-        elif self.communication.waypoint_reached():
-            self.communication.wp_set = False
-
-        elif self.timer_reached():
-            rospy.loginfo("Timer reached, looking again.")
-            self.communication.wp_set = False
-        
-        else:
-            rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
-            time.sleep(0.2)
-
-    def speed_gate_mission(self):
-        if self.gate_set and not self.yellow_set and not self.communication.wp_set:
-            self.detection_results()
-            if not self.depth_is_nan:
-                self.get_closest_buoy() 
-                self.buoy_GPS_loc()
-                if self.closest_color == "yellow_buoy":
-                    self.speed_gate_yellow_buoy()
-                    self.communication.clear_waypoints()
-                    self.communication.make_waypoint(self.yellow_buoy_lat_1, self.yellow_buoy_lon_1, curr=True) 
-                    self.communication.make_waypoint(self.yellow_buoy_lat_2, self.yellow_buoy_lon_2)
-                    self.communication.make_waypoint(self.yellow_buoy_lat_3, self.yellow_buoy_lon_3)
-                    self.communication.make_waypoint(self.start_lat, self.start_lon)
-                    self.communication.send_waypoint()
-                    self.communication.change_mode("AUTO")
-                    self.yellow_set = True
-                else:
-                    self.wp_lat, self.wp_lon = self.dist_to_GPS_cords(self.sg_no_buoy_dist, self.communication.heading, self.communication.lat, self.communication.lon) 
-                    self.communication.change_mode("GUIDED")
-                    self.communication.send_guided_wp(self.wp_lat, self.wp_lon)
-
-            else:
-                rospy.logerr("Depth is NaN, trying again...")
-            
-        elif not self.gate_set:
-            self.detection_results()
-            if not self.depth_is_nan:
-                self.get_closest_buoy() 
-                self.get_2nd_closest_buoy()
-                self.buoy_GPS_loc()
-                try:
-                    self.gate_wp()
-                    self.communication.change_mode("GUIDED")
-                    self.communication.clear_waypoints()
-                    self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
-                    self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
-                    self.communication.send_waypoint()
-                    self.communication.change_mode("AUTO")
-                    self.start_lat = self.wp_lat
-                    self.start_lon = self.wp_lon
-                    self.start_lat_out_rev = 2*self.start_lat - self.wp_lat_out
-                    self.start_lon_out_rev = 2*self.start_lon - self.wp_lon_out
-                    self.gate_set = True
-                except TypeError:
-                    rospy.logerr("No gate detected, trying again...")
-            else:
-                rospy.logerr("Depth is NaN, trying again...")
-
-        elif self.communication.waypoint_reached() and self.yellow_set:
-            rospy.loginfo("Mission complete, returning home.")
-            self.communication.RTL()
-            
-        elif self.communication.waypoint_reached():
-            self.communication.wp_set = False
-        
-        else:
-            rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
-            time.sleep(0.2)
-
 # ---------------------------------------------- ROS Communication ---------------------------------------------- #
 
 class apCommunication:
@@ -553,9 +556,12 @@ class apCommunication:
             except rospy.ROSInterruptException:
                 break
 
+        self.mode = self.ini_mode
+
         rospy.loginfo("MAVROS connection status: " + str(self.is_connected))
         rospy.loginfo("MAVROS armed status: " + str(self.is_armed))
         rospy.loginfo("MAVROS initial mode: " + str(self.ini_mode))
+        
         time.sleep(1)
 
     def shutdownhook(self):
