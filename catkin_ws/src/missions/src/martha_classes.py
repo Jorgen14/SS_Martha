@@ -209,7 +209,7 @@ class droneVision:
                     self.start_lon_out_ret = 2*self.start_lon - self.wp_lon_out
                     self.gate_set = True
                 except IndexError:
-                    rospy.logerr("No gate detected, trying again...")
+                    pass
             else:
                 rospy.logerr("Depth is NaN, trying again...")
 
@@ -723,9 +723,8 @@ class apCommunication:
                 break
             else:
                 self.rotate(rate)
-            rospy.loginfo("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg))
-                
-        rospy.loginfo("Stopped!")
+            rospy.logdebug("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg))
+
         self.stop()
         
     def rotate(self, deg_s): # Positive deg_s is starboard, negative is port
