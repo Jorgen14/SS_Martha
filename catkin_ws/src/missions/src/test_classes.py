@@ -24,6 +24,8 @@ MarthaCom.clear_waypoints()
 if not MarthaCom.is_armed:
     MarthaCom.arm(True)
 
+MarthaCom.change_mode("GUIDED")
+
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:          
@@ -37,7 +39,7 @@ while not rospy.is_shutdown():
         rate.sleep()
         
     except rospy.ROSInterruptException:
-        MarthaCom.RTL()
+        MarthaCom.stop()
         break
 
 rospy.loginfo("Done!")
