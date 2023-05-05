@@ -208,7 +208,7 @@ class droneVision:
                     self.start_lat_out_ret = 2*self.start_lat - self.wp_lat_out
                     self.start_lon_out_ret = 2*self.start_lon - self.wp_lon_out
                     self.gate_set = True
-                except TypeError:
+                except IndexError:
                     rospy.logerr("No gate detected, trying again...")
             else:
                 rospy.logerr("Depth is NaN, trying again...")
