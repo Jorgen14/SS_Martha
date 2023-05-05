@@ -172,6 +172,7 @@ class droneVision:
                 self.buoy_GPS_loc()
                 if self.closest_color == "yellow_buoy":
                     self.speed_gate_yellow_buoy()
+                    self.communication.change_mode("GUIDED")
                     self.communication.clear_waypoints()
                     self.communication.make_waypoint(self.yellow_buoy_lat_1, self.yellow_buoy_lon_1, curr=True) 
                     self.communication.make_waypoint(self.yellow_buoy_lat_2, self.yellow_buoy_lon_2)
@@ -260,7 +261,7 @@ class droneVision:
                 center = ((box[2].item() - box[0].item()) / 2 + box[0].item(), 
                           (box[3].item() - box[1].item()) / 2 + box[1].item())
                 depth_at_det = self.depth_img[int(center[1]), int(center[0])]
-                if math.isnan(depth_at_det):
+                if math.isnan(depth_at_det) or depth_at_det > 20 or depth_at_det < 0.2:
                     self.depth_is_nan = True
                 self.depth_list.append(depth_at_det)
                 Tx = int(center[0]) - self.cx
@@ -723,6 +724,7 @@ class apCommunication:
                 break
             else:
                 self.rotate(rate)
+                time.sleep(0.1)
             rospy.logdebug("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg))
 
         self.stop()
@@ -743,9 +745,9 @@ class apCommunication:
         self.pub_vel.publish(self.cmd_vel)
    
     def move_sideways(self, lin_vel):
-        self.cmd_vel.linear.x = lin_vel
+        self.cmd_vel.linear.z = lin_vel
         self.cmd_vel.linear.y = 0
-        self.cmd_vel.angular.z = 0
+        self.cmd_vel.angular.x = 0
         self.pub_vel.publish(self.cmd_vel)
 
     def stop(self):

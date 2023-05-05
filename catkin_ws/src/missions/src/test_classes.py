@@ -29,10 +29,9 @@ MarthaCom.change_mode("GUIDED")
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:          
-        MarthaCom.rotate_x_deg(30, -10)
-        break
+        #MarthaCom.rotate_x_deg(30, -10)
         #MarthaCom.move_forward(0.8)
-        #MarthaCom.move_sideways(0.8)
+        MarthaCom.move_sideways(0.8)
         time.sleep(0.2)
         scriptTime = datetime.now() - startTime
         rospy.loginfo("Script time: " + str(scriptTime))
