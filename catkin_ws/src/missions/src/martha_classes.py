@@ -128,7 +128,7 @@ class droneVision:
                     elif not self.port_clear:
                         rospy.loginfo("No detections, turning to port to check again.")
                         self.communication.change_mode("GUIDED")
-                        self.communication.rotate_x_deg(-2*self.communication.look_degs, 20)
+                        self.communication.rotate_x_deg(-2*self.communication.look_degs, -20)
                         self.port_clear = True
                     elif self.im_lost():
                         rospy.logerr("I'm lost :(")
@@ -713,14 +713,19 @@ class apCommunication:
 
     def rotate_x_deg(self, x_deg, rate): # Positive x_deg is starboard, negative is port
         targ_hdg = self.heading + x_deg
-        tol = round(1/4 * rate, 2) # Tolerance is 1/4 of the rate
+        tol = round(1/4 * np.abs(rate), 2) # Tolerance is 1/4 of the rate
         if targ_hdg > 360:
             targ_hdg -= 360
         elif targ_hdg < 0:
             targ_hdg += 360
-        while not self.ctrl_c or (self.heading > targ_hdg - tol and self.heading < targ_hdg + tol):
-            rospy.logdebug("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg))
-            self.rotate(rate)
+        while not self.ctrl_c: 
+            if (self.heading > targ_hdg - tol) and (self.heading < targ_hdg + tol):
+                break
+            else:
+                self.rotate(rate)
+            rospy.loginfo("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg))
+                
+        rospy.loginfo("Stopped!")
         self.stop()
         
     def rotate(self, deg_s): # Positive deg_s is starboard, negative is port
