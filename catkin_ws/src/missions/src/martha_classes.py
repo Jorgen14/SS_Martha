@@ -33,6 +33,9 @@ class droneVision:
         self.start_lat = None
         self.start_lon = None
 
+        self.docking_hdg = None
+        self.start_docking = False
+
         self.yellow_set = False
         self.gate_set = False
         self.mission_complete = False
@@ -200,18 +203,21 @@ class droneVision:
                 self.get_2nd_closest_buoy()
                 self.buoy_GPS_loc()
                 try:
-                    self.gate_wp()
-                    self.communication.change_mode("GUIDED")
-                    self.communication.clear_waypoints()
-                    self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
-                    self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
-                    self.communication.send_waypoint()
-                    self.communication.change_mode("AUTO")
-                    self.start_lat = self.wp_lat
-                    self.start_lon = self.wp_lon
-                    self.start_lat_out_ret = 2*self.start_lat - self.wp_lat_out
-                    self.start_lon_out_ret = 2*self.start_lon - self.wp_lon_out
-                    self.gate_set = True
+                    if self.check_buoy_gate():
+                        self.gate_wp()
+                        self.communication.change_mode("GUIDED")
+                        self.communication.clear_waypoints()
+                        self.communication.make_waypoint(self.wp_lat, self.wp_lon, curr=True) 
+                        self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
+                        self.communication.send_waypoint()
+                        self.communication.change_mode("AUTO")
+                        self.start_lat = self.wp_lat
+                        self.start_lon = self.wp_lon
+                        self.start_lat_out_ret = self.wp_lat_out_ret
+                        self.start_lon_out_ret = self.wp_lon_out_ret
+                        self.gate_set = True
+                    else:
+                        rospy.logwarn("No gate detected.")
                 except IndexError:
                     pass
             else:
@@ -223,11 +229,40 @@ class droneVision:
             self.mission_complete = True
             
         elif self.communication.waypoint_reached():
-            self.communication.wp_set = False
+            self.communication.wp_set = self.start_docking
         
         else:
             rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
             time.sleep(0.2)
+
+    def docking_mission(self):
+        if not self.communication.wp_set:
+            self.detection_results()
+            if not self.depth_is_nan:
+                self.get_closest_buoy() 
+                self.get_2nd_closest_buoy()
+                self.buoy_GPS_loc()
+                try:
+                    self.gate_wp()
+                    self.communication.change_mode("GUIDED")
+                    self.communication.send_guided_wp(self.wp_lat_out_ret, self.wp_lon_out_ret)
+                    self.docking_hdg = self.buoys_bearing
+                except IndexError:
+                    pass
+            else:
+                rospy.logerr("Depth is NaN, trying again...")
+        
+        elif self.communication.waypoint_reached():
+            self.start_docking = True
+            #self.start_timer(3)
+        
+        elif self.start_docking:
+            if self.docking_hdg - 5 > self.communication.heading:
+                self.communication.rotate_x_deg(self.docking_hdg, 10)
+            elif self.docking_hdg + 5 < self.communication.heading:
+                self.communication.rotate_x_deg(self.docking_hdg, -10)
+            else:
+                self.communication.move_sideways(0.5)
 
     def image_callback(self, msg):
         img_left = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
@@ -470,11 +505,14 @@ class droneVision:
         self.wp_lat = round((self.closest_GPS[0] + self.second_closest_GPS[0]) / 2, self.GPS_round)
         self.wp_lon = round((self.closest_GPS[1] + self.second_closest_GPS[1]) / 2, self.GPS_round)
 
-        buoys_bearing = self.two_points_bearing(self.closest_GPS[0], self.closest_GPS[1], self.second_closest_GPS[0], self.second_closest_GPS[1])
-        rospy.logdebug("Buoys bearing: " + str(buoys_bearing))
-        out_gate_heading = self.hdg_rel_to_bearing(buoys_bearing, 90, self.communication.heading)
+        self.buoys_bearing = self.two_points_bearing(self.closest_GPS[0], self.closest_GPS[1], self.second_closest_GPS[0], self.second_closest_GPS[1])
+        rospy.logdebug("Buoys bearing: " + str(self.buoys_bearing))
+        out_gate_heading = self.hdg_rel_to_bearing(self.buoys_bearing, 90, self.communication.heading)
         rospy.logdebug("Out of gate heading: " + str(out_gate_heading))
         self.wp_lat_out, self.wp_lon_out = self.dist_to_GPS_cords(self.out_dist, out_gate_heading, self.wp_lat, self.wp_lon)
+
+        self.wp_lat_out_ret = 2*self.wp_lat - self.wp_lat_out
+        self.wp_lon_out_ret = 2*self.wp_lon - self.wp_lon_out
 
         rospy.loginfo("Waypoint set at: " + "(" +  str(self.wp_lat) + ", " + str(self.wp_lon) + ")")
         rospy.loginfo("Continuing " + str(self.out_dist) + "m to get clear of gate, to waypoint: " + "(" +  str(self.wp_lat_out) + ", " + str(self.wp_lon_out) + ")")
@@ -730,7 +768,7 @@ class apCommunication:
                 break
             else:
                 self.rotate(rate)
-                time.sleep(0.1)
+                rospy.sleep(0.1)
             rospy.logdebug("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg))
         self.stop()
         
@@ -750,9 +788,9 @@ class apCommunication:
         self.pub_vel.publish(self.cmd_vel)
    
     def move_sideways(self, lin_vel):
-        self.cmd_vel.linear.z = lin_vel
+        self.cmd_vel.linear.x = lin_vel
         self.cmd_vel.linear.y = 0
-        self.cmd_vel.angular.x = 0
+        self.cmd_vel.angular.z = 0
         self.pub_vel.publish(self.cmd_vel)
 
     def stop(self):
