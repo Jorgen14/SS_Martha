@@ -35,6 +35,9 @@ class droneVision:
 
         self.docking_hdg = None
         self.start_docking = False
+        self.first_timer = False
+        self.docking_timer = None
+        self.second_timer = False
 
         self.yellow_set = False
         self.gate_set = False
@@ -87,7 +90,7 @@ class droneVision:
                         self.communication.make_waypoint(self.wp_lat_out, self.wp_lon_out)
                         self.communication.send_waypoint()
                         self.communication.change_mode("AUTO")
-                        self.start_timer(self.closest_dist / self.communication.max_speed + 5)
+                        self.start_timer(self.closest_dist / self.communication.max_speed + 7.5)
                         self.reset_search_vars()
                     else:
                         rospy.loginfo("Buoy gate detected, but not in the right orientation.")
@@ -103,6 +106,7 @@ class droneVision:
                     self.reset_search_vars()
 
                 elif self.closest_color == "yellow_buoy":
+                    rospy.loginfo("Yellow buoy detected, but also one other buoy.")
                     if self.check_rel_dist() and not self.rel_dist_err:
                         rospy.loginfo("Yellow buoy detected, but suspiciously close to other buoy.")
                         self.communication.change_mode("GUIDED")
@@ -168,7 +172,7 @@ class droneVision:
         
         else:
             rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
-            time.sleep(0.2)
+            time.sleep(0.1)
 
     def speed_gate_mission(self):
         if self.gate_set and not self.yellow_set and not self.communication.wp_set:
@@ -226,7 +230,6 @@ class droneVision:
         elif self.communication.waypoint_reached() and self.yellow_set:
             rospy.loginfo("Mission complete, returning home.")
             self.communication.RTL()
-            self.mission_complete = True
             
         elif self.communication.waypoint_reached():
             self.communication.wp_set = self.start_docking
@@ -251,18 +254,46 @@ class droneVision:
                     pass
             else:
                 rospy.logerr("Depth is NaN, trying again...")
-        
-        elif self.communication.waypoint_reached():
-            self.start_docking = True
-            #self.start_timer(3)
+
+        elif self.timer_reached() and self.docking_timer:
+            rospy.loginfo("Docking timer reached, starting undocking...")
+            self.start_timer(5)
+            self.start_docking = False
+            self.docking_timer = False
+            self.second_timer = True
         
         elif self.start_docking:
             if self.docking_hdg - 5 > self.communication.heading:
+                rospy.loginfo("Correcting heading...")
                 self.communication.rotate_x_deg(self.docking_hdg, 10)
             elif self.docking_hdg + 5 < self.communication.heading:
+                rospy.loginfo("Correcting heading...")
                 self.communication.rotate_x_deg(self.docking_hdg, -10)
+            elif self.timer_reached() and self.first_timer:
+                rospy.loginfo("Starting docking timer!")
+                self.start_timer(30)
+                self.first_timer = False
+                self.docking_timer = True
             else:
+                rospy.loginfo("Docking...")
                 self.communication.move_sideways(0.5)
+
+        elif self.second_timer:
+            if self.timer_reached():
+                rospy.loginfo("Undocking timer reached, mission complete!")
+                self.communication.RTL()
+            else:
+                rospy.loginfo("Undocking...")
+                self.communication.move_sideways(-0.5)
+            
+        elif self.communication.waypoint_reached():
+            self.start_docking = True
+            self.start_timer(5)
+            self.first_timer = True
+        
+        else:
+            rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
+            time.sleep(0.1)
 
     def image_callback(self, msg):
         img_left = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
