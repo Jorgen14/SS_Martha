@@ -11,7 +11,7 @@ if ROS_DEBUG:
 else:
     rospy.init_node("TestNode")  
 
-rate = rospy.Rate(1)   
+rate = rospy.Rate(5)   
 
 first = False
 second = False
@@ -33,6 +33,11 @@ MarthaCom.change_mode("GUIDED")
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:  
+
+        #MarthaCom.rotate_x_deg(30, -10)
+        #MarthaCom.move_forward(2.0)
+        MarthaCom.move_sideways(2.0)
+        #MarthaCom.stop()
         """
         if not first:
             MarthaCom.send_guided_wp(-35.36334, 149.16524)
@@ -40,7 +45,7 @@ while not rospy.is_shutdown():
         elif MarthaCom.waypoint_reached():
             break
 
-        """        
+                
         if not first:
             MarthaCom.send_guided_wp(-35.36222, 149.16509)
             #MarthaCom.send_guided_wp(-35.36334, 149.16524)
@@ -59,7 +64,8 @@ while not rospy.is_shutdown():
         else:
             rospy.loginfo("Waiting...")
             time.sleep(0.2)
-        
+        """
+        time.sleep(0.1)
         scriptTime = datetime.now() - startTime
         rospy.loginfo("Script time: " + str(scriptTime))
         rate.sleep()
@@ -71,6 +77,3 @@ while not rospy.is_shutdown():
 rospy.loginfo("Done!")
 
 
-#MarthaCom.rotate_x_deg(30, -10)
-#MarthaCom.move_forward(0.8)
-#MarthaCom.move_sideways(0.8)

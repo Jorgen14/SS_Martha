@@ -591,6 +591,7 @@ class apCommunication:
         self.cmd_vel = Twist()
         self.pub_guided_wp = rospy.Publisher("/mavros/setpoint_raw/global", GlobalPositionTarget, queue_size=10)
         self.guided_wp = GlobalPositionTarget()
+        #self.pub_act = rospy.Publisher("/mavros
 
         self.sub_state = rospy.Subscriber("/mavros/state", State, self.state_callback)
         self.sub_GPS = rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.gps_callback)
@@ -821,7 +822,7 @@ class apCommunication:
     def move_sideways(self, lin_vel):
         self.cmd_vel.linear.x = lin_vel
         self.cmd_vel.linear.y = 0
-        self.cmd_vel.angular.z = 0
+        self.cmd_vel.angular.z = 0#np.radians(60)
         self.pub_vel.publish(self.cmd_vel)
 
     def stop(self):
