@@ -14,7 +14,7 @@ from mavros_msgs.srv import WaypointPush, WaypointClear, CommandBool, CommandBoo
 class droneVision:
 
     GPS_round = 6
-    rel_dist_thresh = 2.0 # Maximum relative distance between buoys
+    rel_dist_thresh = 3.0 # Maximum relative distance between buoys
     out_dist = 1.0 # meters to get clear of buoy gate
     wp_dist_from_buoy = 1.5 # meters to set waypoint from yellow buoy
     no_buoy_dist = 2.0 # if no buoys detected move x_meters to look for buoys
@@ -396,7 +396,7 @@ class droneVision:
             rospy.logdebug("Gate not found.")
             return False
 
-    def check_gate_orientation(self): # Assumes check_buoy_gate is already called
+    def check_gate_orientation(self): # Assumes check_buoy_gate function is already called
         try:
             if self.closest_color == "green_buoy":
                 if (self.closest_bearing - self.second_closest_bearing) < 0: 
@@ -591,12 +591,10 @@ class apCommunication:
         self.cmd_vel = Twist()
         self.pub_guided_wp = rospy.Publisher("/mavros/setpoint_raw/global", GlobalPositionTarget, queue_size=10)
         self.guided_wp = GlobalPositionTarget()
-        #self.pub_act = rospy.Publisher("/mavros
 
         self.sub_state = rospy.Subscriber("/mavros/state", State, self.state_callback)
         self.sub_GPS = rospy.Subscriber("/mavros/global_position/global", NavSatFix, self.gps_callback)
         self.sub_heading = rospy.Subscriber("/mavros/global_position/compass_hdg", Float64, self.heading_callback)
-        self.sub_vel = rospy.Subscriber("/mavros/global_position/raw/gps_vel", TwistStamped, self.vel_callback)
         self.sub_wp_reached = rospy.Subscriber("/mavros/mission/reached", WaypointReached, self.wp_reached_callback)
         self.sub_wps = rospy.Subscriber("/mavros/mission/waypoints", WaypointList, self.wps_callback)
         
@@ -612,8 +610,6 @@ class apCommunication:
         self.wp_list = []
         self.wps = None
         self.heading = None
-        self.lin_vel_x = None
-        self.lin_vel_y = None
         self.wp_reached = False
         self.reached_seq = None
         self.curr_seq = None
@@ -683,12 +679,6 @@ class apCommunication:
     def heading_callback(self, msg):
         self.heading = msg.data
         rospy.logdebug("Drone heading: " + str(self.heading))
-
-    def vel_callback(self, msg):
-        self.lin_vel_x = msg.twist.linear.x
-        self.lin_vel_y = msg.twist.linear.y
-        
-        rospy.logdebug("Linear velocity forward: " + str(self.lin_vel_y) + ", sideways: " + str(self.lin_vel_x))
 
     def wps_callback(self, msg):
         self.curr_seq = msg.current_seq
