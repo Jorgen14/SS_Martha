@@ -450,15 +450,13 @@ class droneVision:
             self.closest_GPS.append(round(np.degrees(closest_buoy_lon), self.GPS_round)) 
             rospy.logdebug("Closest buoy GPS: " + str(self.closest_GPS))
 
-            if not self.second_is_none: # and not self.closest_color == 'yellow_buoy':
+            if not self.second_is_none:
                 second_closest_bearing_rad = np.radians(drone_heading + self.second_closest_bearing) # With respect to North
                 second_closest_buoy_lat = np.arcsin(np.sin(drone_lat_rad) * np.cos(self.second_closest_dist/R) + np.cos(drone_lat_rad) * np.sin(self.second_closest_dist/R) * np.cos(second_closest_bearing_rad))
                 second_closest_buoy_lon = drone_lon_rad + np.arctan2(np.sin(second_closest_bearing_rad) * np.sin(self.second_closest_dist/R) * np.cos(drone_lat_rad), np.cos(self.second_closest_dist/R) - np.sin(drone_lat_rad) * np.sin(second_closest_buoy_lat))
                 self.second_closest_GPS.append(round(np.degrees(second_closest_buoy_lat), self.GPS_round))
                 self.second_closest_GPS.append(round(np.degrees(second_closest_buoy_lon), self.GPS_round)) 
                 rospy.logdebug("Second closest buoy GPS: " + str(self.second_closest_GPS))
-            #elif self.closest_color == 'yellow_buoy':
-             #   rospy.loginfo("Yellow buoy detected.")
             else:
                 rospy.logwarn("Only one buoy detected!")
 
@@ -563,7 +561,7 @@ class droneVision:
     def speed_gate_yellow_buoy(self):
         drone_buoy_bearing = self.two_points_bearing(self.communication.lat, self.communication.lon, self.closest_GPS[0], self.closest_GPS[1])
 
-        if self.closest_bearing < 0: # Decide which side of the buoy to go around 
+        if self.closest_bearing < 0: # Decide which side of the buoy to go around first
             x = -1
         else:
             x = 1
