@@ -66,7 +66,7 @@ class droneVision:
             pass
         
         rospy.logwarn("Warming up model...")
-        self.get_detections() # To warm up the model
+        self.get_detections()
 
         rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
         rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape)) 
@@ -330,7 +330,7 @@ class droneVision:
                 center = ((box[2].item() - box[0].item()) / 2 + box[0].item(), 
                           (box[3].item() - box[1].item()) / 2 + box[1].item())
                 depth_at_det = self.depth_img[int(center[1]), int(center[0])]
-                if math.isnan(depth_at_det) or depth_at_det > 20 or depth_at_det < 0.2:
+                if math.isnan(depth_at_det):
                     self.depth_is_nan = True
                 self.depth_list.append(depth_at_det)
                 Tx = int(center[0]) - self.cx

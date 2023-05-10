@@ -3,7 +3,7 @@ from datetime import datetime
 import cv2
 
 # Load a model
-model = YOLO('YOLOv8/buoy_s.pt')  # load a custom model
+model = YOLO('YOLOv8/buoy_n.pt')  # load a custom model
 
 filepath = "C:\GitHub\SS_Martha\YOLOv8\Test"
 #filename = "IMG_2088.MOV" 
@@ -25,7 +25,7 @@ while 1:
     ret, frame = cam.read()
     if ret:#itt == 0:
         # Validate the model
-        results = model.predict(source=frame, show=True, save=False, conf=0.2)
+        results = model.predict(source=frame, show=True, save=False, conf=0.5)
         det_center = []
         det_names = []
         for result in results:
