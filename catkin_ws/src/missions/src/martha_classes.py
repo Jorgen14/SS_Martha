@@ -577,7 +577,7 @@ class droneVision:
         angle_buoy_wp_3 = -x*np.degrees(np.arctan2(self.wp_dist_from_buoy, self.closest_dist))
         self.yellow_buoy_lat_3, self.yellow_buoy_lon_3 = self.dist_to_GPS_cords(dist_to_wp_3, drone_buoy_bearing + angle_buoy_wp_3, self.communication.lat, self.communication.lon)
 
-# ---------------------------------------------- ROS Communication ---------------------------------------------- #
+# ---------------------------------------------- Autopilot Communication ---------------------------------------------- #
 
 class apCommunication:
 
@@ -716,7 +716,7 @@ class apCommunication:
     def make_waypoint(self, lat, lon, cmd=16, curr=False, autCont=True):
         wp = Waypoint()
         wp.frame = 0 # Global frame
-        wp.command = cmd  # 16 = Nav command, 
+        wp.command = cmd  # 16 = Nav command, 20=RTL
         wp.is_current = curr
         wp.autocontinue = autCont
         wp.param1 = 0  # HOLD time at WP
@@ -755,7 +755,7 @@ class apCommunication:
     def send_guided_wp(self, lat, lon):
         self.guided_wp.latitude = lat
         self.guided_wp.longitude = lon
-        while not self.ctrl_c: # Important when publishing once
+        while not self.ctrl_c:
             connections = self.pub_guided_wp.get_num_connections()
             if connections > 0:
                 self.pub_guided_wp.publish(self.guided_wp)
@@ -777,19 +777,27 @@ class apCommunication:
         self.change_mode("AUTO")
 
     def rotate_x_deg(self, x_deg, rate): # Positive x_deg is starboard, negative is port
-        targ_hdg = self.heading + x_deg
         tol = round(1/4 * np.abs(rate), 2) # Tolerance is 1/4 of the rate
-        if targ_hdg > 360:
-            targ_hdg -= 360
-        elif targ_hdg < 0:
-            targ_hdg += 360
+        targ_hdg_low = self.heading + x_deg - tol
+        targ_hdg_high = self.heading + x_deg + tol
+
+        if targ_hdg_low >= 360:
+            targ_hdg_low -= 360
+        elif targ_hdg_low < 0:
+            targ_hdg_low += 360
+
+        if targ_hdg_high >= 360:
+            targ_hdg_high -= 360
+        elif targ_hdg_high < 0:
+            targ_hdg_high += 360
+
         while not self.ctrl_c: 
-            if (self.heading > targ_hdg - tol) and (self.heading < targ_hdg + tol):
+            if (self.heading > targ_hdg_low) and (self.heading < targ_hdg_high):
                 break
             else:
                 self.rotate(rate)
                 rospy.sleep(0.1)
-            rospy.logdebug("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg))
+            rospy.logdebug("Current heading: " + str(self.heading) + ", Target heading: " + str(targ_hdg_high-tol))
         self.stop()
         
     def rotate(self, deg_s): # Positive deg_s is starboard, negative is port
