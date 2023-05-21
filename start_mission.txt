@@ -1,0 +1,3 @@
+1. Open a terminal
+2. in terminal run: sudo chmod 666 /dev/ttyACM0
+3. in terminal run: roslaunch missions <mission launch file>
