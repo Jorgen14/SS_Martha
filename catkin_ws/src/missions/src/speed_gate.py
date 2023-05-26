@@ -22,6 +22,14 @@ MarthaCom.clear_waypoints()
 if not MarthaCom.is_armed:
     MarthaCom.arm(True)
 
+firstLat = input("Latitude: ")
+firstLon = input("Longitude: ")
+MarthaCom.change_mode("GUIDED")
+MarthaCom.send_guided_wp(firstLat, firstLon)
+
+while not MarthaCom.waypoint_reached() or not rospy.is_shutdown():
+    rospy.loginfo("On my way to startpoint...")
+
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:          
@@ -32,3 +40,5 @@ while not rospy.is_shutdown():
         
     except rospy.ROSInterruptException:
         break
+
+MarthaVision.zed.close()

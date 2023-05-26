@@ -2,6 +2,7 @@ import time
 import math
 import cv2 as cv
 import numpy as np
+import pyzed.sl as sl
 from ultralytics import YOLO
 from datetime import datetime, timedelta
 import rospy
@@ -25,8 +26,46 @@ class droneVision:
     def __init__(self, DEBUG_CAM=False):
         self.DEBUG_CAM = DEBUG_CAM
 
-        self.img_array = None
-        self.depth_img = None
+        self.zed = sl.Camera()
+        init_params = sl.InitParameters()
+        init_params.camera_resolution = sl.RESOLUTION.HD2K # Options: HD2K, HD1080, HD720, VGA
+        init_params.depth_mode = sl.DEPTH_MODE.PERFORMANCE
+        init_params.coordinate_units = sl.UNIT.METER
+        init_params.sdk_verbose = True
+
+        self.runtime_params = sl.RuntimeParameters()
+        self.zed_status = self.zed.open(init_params)
+        
+        self.zed.set_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE, -1) # -1 = auto
+        rospy.loginfo("Exposure: " + str(self.zed.get_camera_settings(sl.VIDEO_SETTINGS.EXPOSURE)))
+
+        if self.zed_status != sl.ERROR_CODE.SUCCESS:
+            print (repr(self.zed_status))
+            exit(1)
+
+        positional_tracking_param = sl.PositionalTrackingParameters()
+        positional_tracking_param.set_floor_as_origin = True
+        self.zed.enable_positional_tracking(positional_tracking_param)
+
+        obj_param = sl.ObjectDetectionParameters()
+        obj_param.detection_model = sl.DETECTION_MODEL.CUSTOM_BOX_OBJECTS
+        obj_param.enable_tracking = True
+        obj_param.enable_mask_output = True
+        self.zed.enable_object_detection(obj_param)
+
+        self.objects = sl.Objects()
+        self.obj_runtime_param = sl.ObjectDetectionRuntimeParameters() 
+        
+        positional_tracking_parameters = sl.PositionalTrackingParameters()
+        self.zed.enable_positional_tracking(positional_tracking_parameters)
+
+        self.width = self.zed.get_camera_information().camera_resolution.width
+        self.hfov = self.zed.get_camera_information().camera_configuration.calibration_parameters.left_cam.h_fov
+        self.cx = self.zed.get_camera_information().camera_configuration.calibration_parameters.left_cam.cx
+        self.lamda_x = self.hfov / self.width
+
+        self.img_left = sl.Mat()
+        self.depth_map = sl.Mat()
 
         self.wp_lat_out = None
         self.wp_lon_out = None
@@ -50,22 +89,8 @@ class droneVision:
 
         self.communication = apCommunication()
         self.model = YOLO('/home/navo/GitHub/SS_Martha/YOLOv8/buoy_s.pt') 
-
-        self.sub_img = rospy.Subscriber("/zed2/zed_node/left/image_rect_color", Image, self.image_callback)
-        self.sub_depth = rospy.Subscriber("/zed2/zed_node/depth/depth_registered", Image, self.depth_callback)
-        self.sub_cam_info = rospy.Subscriber("/zed2/zed_node/left/camera_info", CameraInfo, self.cam_info_callback)
-
-        try:
-            while self.img_array == None:
-                rospy.loginfo("Waiting for image...")
-                time.sleep(1)
-            while self.depth_img == None:
-                rospy.loginfo("Waiting for depth image...")
-                time.sleep(1)
-        except ValueError:
-            pass
         
-        rospy.logwarn("Warming up model...")
+        rospy.loginfo("Warming up model...")
         self.get_detections()
 
         rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
@@ -264,10 +289,10 @@ class droneVision:
         
         elif self.start_docking:
             if self.docking_hdg - 5 > self.communication.heading:
-                rospy.loginfo("Correcting heading...")
+                rospy.loginfo("Correcting heading starboard...")
                 self.communication.rotate_x_deg(self.docking_hdg, 10)
             elif self.docking_hdg + 5 < self.communication.heading:
-                rospy.loginfo("Correcting heading...")
+                rospy.loginfo("Correcting heading port...")
                 self.communication.rotate_x_deg(self.docking_hdg, -10)
             elif self.timer_reached() and self.first_timer:
                 rospy.loginfo("Starting docking timer!")
@@ -276,7 +301,8 @@ class droneVision:
                 self.docking_timer = True
             else:
                 rospy.loginfo("Docking...")
-                self.communication.move_sideways(0.5)
+                self.communication.change_mode("LOITER")
+                #self.communication.move_sideways(0.5)
 
         elif self.second_timer:
             if self.timer_reached():
@@ -284,7 +310,7 @@ class droneVision:
                 self.communication.RTL()
             else:
                 rospy.loginfo("Undocking...")
-                self.communication.move_sideways(-0.5)
+                #self.communication.move_sideways(-0.5)
             
         elif self.communication.waypoint_reached():
             self.start_docking = True
@@ -295,28 +321,26 @@ class droneVision:
             rospy.loginfo("Waypoints set, waiting to reach waypoint before setting next waypoint.")
             time.sleep(0.1)
 
-    def image_callback(self, msg):
-        img_left = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.width, -1)
-        img_left = img_left[:,:,:3]
-        self.img_array = cv.normalize(img_left, None, 0, 255, cv.NORM_MINMAX, cv.CV_8U)
+    def _image_and_depth_map(self):
+        rospy.logdebug("Getting image and depth map...")
 
-    def depth_callback(self, msg):
-        depth_map = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.width, -1)
-        self.depth_img = depth_map[:,:, 0] 
+        if self.zed.grab(self.runtime_params) == sl.ERROR_CODE.SUCCESS:
+            self.zed.retrieve_image(self.img_left, sl.VIEW.LEFT)
+            self.np_img_left = self.img_left.get_data()
+            self.np_img_left = self.np_img_left[:,:,:3] # Remove alpha channel
+            self.zed.retrieve_measure(self.depth_map, sl.MEASURE.DEPTH)
+            self.depth_img = self.depth_map.get_data()
+        else:
+            rospy.logfatal("No image! Exiting program...")
+            exit(1)
 
-    def cam_info_callback(self, msg):
-        width = msg.width
-        fx = msg.K[0]
-        hfov = np.degrees(2 * np.arctan(width / (2 * fx)))
-        self.lamda_x = hfov / width
-        self.cx = msg.K[2]
-        
-    def get_detections(self):
+    def _get_detections(self):
         rospy.logdebug("Getting detections...")
-        return self.model.predict(source=self.img_array, conf=0.5, show=self.DEBUG_CAM) 
+        return self.model.predict(source=self.np_img_left, conf=0.5, show=self.DEBUG_CAM) 
     
     def detection_results(self):
-        results = self.get_detections()
+        self._image_and_depth_map()
+        results = self._get_detections()
         self.depth_is_nan = False
 
         rospy.logdebug("Getting detection results...")
@@ -329,10 +353,9 @@ class droneVision:
             for box in result.boxes.xyxy:
                 center = ((box[2].item() - box[0].item()) / 2 + box[0].item(), 
                           (box[3].item() - box[1].item()) / 2 + box[1].item())
-                depth_at_det = self.depth_img[int(center[1]), int(center[0])]
-                if math.isnan(depth_at_det):
+                if math.isnan(self.depth_img[int(center[1])][int(center[0])]):
                     self.depth_is_nan = True
-                self.depth_list.append(depth_at_det)
+                self.depth_list.append(self.depth_img[int(center[1])][int(center[0])])
                 Tx = int(center[0]) - self.cx
                 theta = Tx * self.lamda_x
                 self.bearing_list.append(theta)
