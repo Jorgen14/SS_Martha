@@ -91,9 +91,10 @@ class droneVision:
         self.model = YOLO('/home/navo/GitHub/SS_Martha/YOLOv8/buoy_s.pt') 
         
         rospy.loginfo("Warming up model...")
-        self.get_detections()
+        self._image_and_depth_map()
+        self._get_detections()
 
-        rospy.logdebug("Image received, shape: " + str(self.img_array.shape))
+        rospy.logdebug("Image received, shape: " + str(self.np_img_left.shape))
         rospy.logdebug("Depth image received, shape: " + str(self.depth_img.shape)) 
         
         rospy.loginfo("Camera initialized!")

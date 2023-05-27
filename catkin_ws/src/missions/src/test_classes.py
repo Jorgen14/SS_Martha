@@ -4,7 +4,7 @@ import time
 from martha_classes import droneVision, apCommunication
 from datetime import datetime, timedelta
 
-ROS_DEBUG = True
+ROS_DEBUG = False
 
 if ROS_DEBUG:
     rospy.init_node("TestNode", log_level=rospy.DEBUG)
@@ -21,12 +21,17 @@ start_timer = datetime.now() + timedelta(seconds=125/4)
 
 MarthaVision = droneVision(DEBUG_CAM=False)
 
-#MarthaCom = apCommunication()
+MarthaCom = apCommunication()
 
-#MarthaCom.clear_waypoints()
+MarthaCom.clear_waypoints()
 
-#if not MarthaCom.is_armed:
- #   MarthaCom.arm(True)
+if not MarthaCom.is_armed:
+    MarthaCom.arm(True)
+
+firstLat = float(input("Latitude: "))
+firstLon = float(input("Longitude: "))
+MarthaCom.change_mode("GUIDED")
+MarthaCom.send_guided_wp(firstLat, firstLon)
 
 #MarthaCom.change_mode("GUIDED")
 

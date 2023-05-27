@@ -1,6 +1,5 @@
 <launch>
 
-	<include file="$(find zed_wrapper)/launch/zed2.launch"/>
 	<include file="$(find mavros)/launch/apm.launch"/>
 
 	<node pkg="missions"
