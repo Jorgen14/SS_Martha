@@ -65,8 +65,8 @@ else:
 if not MarthaCom.is_armed:
     MarthaCom.arm(True)
 
-firstLat = input("Latitude: ")
-firstLon = input("Longitude: ")
+firstLat = float(input("Latitude: "))
+firstLon = float(input("Longitude: "))
 MarthaCom.change_mode("GUIDED")
 MarthaCom.send_guided_wp(firstLat, firstLon)
 
