@@ -83,10 +83,10 @@ while not MarthaCom.waypoint_reached() or not rospy.is_shutdown():# or not kills
             relay_on(bus0, DEVICE_ADDRESS3)
             relay_off(bus0, DEVICE_ADDRESS4)
         else:
-            relay_on(bus1, DEVICE_ADDRESS1)
+            relay_off(bus1, DEVICE_ADDRESS1)
             relay_off(bus1, DEVICE_ADDRESS2)
             relay_off(bus0, DEVICE_ADDRESS3)
-            relay_on(bus0, DEVICE_ADDRESS4)
+            relay_off(bus0, DEVICE_ADDRESS4)
         rospy.loginfo("On my way to startpoint...")
     except rospy.ROSInterruptException:
         break
