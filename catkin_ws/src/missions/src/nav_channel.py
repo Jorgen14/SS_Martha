@@ -98,7 +98,7 @@ while not MarthaCom.waypoint_reached() or not rospy.is_shutdown():# or not kills
         rospy.loginfo("On my way to startpoint...")
     except rospy.ROSInterruptException:
         break
-
+"""
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:
@@ -124,7 +124,7 @@ while not rospy.is_shutdown():
         
     except rospy.ROSInterruptException:
         break
-
+"""
 MarthaVision.zed.close()
 
 """
