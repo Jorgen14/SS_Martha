@@ -72,12 +72,12 @@ MarthaCom.send_guided_wp(firstLat, firstLon)
 
 while not MarthaCom.waypoint_reached() or not rospy.is_shutdown():# or not killswitch:
     try:
-        if MarthaCom.mode == 'AUTO' or MarthaCom.mode == 'GUIDED':# and not killswitch:
+        if MarthaCom.ini_mode == 'AUTO' or MarthaCom.ini_mode == 'GUIDED':# and not killswitch:
             relay_on(bus1, DEVICE_ADDRESS1)
             relay_off(bus1, DEVICE_ADDRESS2)
             relay_off(bus0, DEVICE_ADDRESS3)
             relay_on(bus0, DEVICE_ADDRESS4)
-        elif MarthaCom.mode == 'MANUAL':# and not killswitch:
+        elif MarthaCom.ini_mode == 'MANUAL':# and not killswitch:
             relay_on(bus1, DEVICE_ADDRESS1)
             relay_off(bus1, DEVICE_ADDRESS2)
             relay_on(bus0, DEVICE_ADDRESS3)
