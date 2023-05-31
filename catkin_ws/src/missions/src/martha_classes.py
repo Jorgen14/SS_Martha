@@ -337,7 +337,7 @@ class droneVision:
 
     def _get_detections(self):
         rospy.logdebug("Getting detections...")
-        return self.model.predict(source=self.np_img_left, conf=0.5, show=self.DEBUG_CAM) 
+        return self.model.predict(source=self.np_img_left, conf=0.2, show=self.DEBUG_CAM) 
     
     def detection_results(self):
         self._image_and_depth_map()
