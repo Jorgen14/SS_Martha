@@ -77,8 +77,10 @@ firstLon = float(input("Longitude: "))
 MarthaCom.change_mode("GUIDED")
 MarthaCom.send_guided_wp(firstLat, firstLon)
 
-while not MarthaCom.waypoint_reached() or not rospy.is_shutdown():
+while not rospy.is_shutdown():
     try:
+        if MarthaCom.waypoint_reached():
+            break
         killswitch = GPIO.input(emergency_stop)
         if (MarthaCom.ini_mode == 'AUTO' or MarthaCom.ini_mode == 'GUIDED') and killswitch:
             relay_on(bus1, DEVICE_ADDRESS1)
