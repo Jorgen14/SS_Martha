@@ -16,7 +16,7 @@ class droneVision:
 
     GPS_round = 6
     rel_dist_thresh = 3.0 # Maximum relative distance between buoys
-    out_dist = 1.0 # meters to get clear of buoy gate
+    out_dist = 0.5 # meters to get clear of buoy gate
     wp_dist_from_buoy = 1.5 # meters to set waypoint from yellow buoy
     no_buoy_dist = 2.0 # if no buoys detected move x_meters to look for buoys
     sg_no_buoy_dist = 5.0 # Same as above but for speed gate
