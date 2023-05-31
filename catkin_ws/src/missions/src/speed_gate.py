@@ -71,7 +71,7 @@ else:
 
 if not MarthaCom.is_armed:
     MarthaCom.arm(True)
-
+"""
 firstLat = float(input("Latitude: "))
 firstLon = float(input("Longitude: "))
 MarthaCom.change_mode("GUIDED")
@@ -109,7 +109,7 @@ while not rospy.is_shutdown():
         break
 
 rospy.loginfo("Start point reached, starting mission!")
-
+"""
 while not rospy.is_shutdown():
     startTime = datetime.now()
     try:
