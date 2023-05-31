@@ -18,6 +18,8 @@ GPIO.setmode(GPIO.BOARD)
 emergency_stop = 15
 GPIO.setup(emergency_stop, GPIO.IN)
 
+killswitch = GPIO.input(emergency_stop)
+
 # I2C address of the device
 DEVICE_ADDRESS1 = 0x18
 DEVICE_ADDRESS2 = 0x19
@@ -34,9 +36,9 @@ def relay_off(bus, address):
 ROS_DEBUG = False
 
 if ROS_DEBUG:
-    rospy.init_node("Docking", log_level=rospy.DEBUG)
+    rospy.init_node("NavChannel", log_level=rospy.DEBUG)
 else:
-    rospy.init_node("Docking")  
+    rospy.init_node("NavChannel")  
 
 rate = rospy.Rate(1)   
 
@@ -46,20 +48,92 @@ MarthaCom = apCommunication()
 
 MarthaCom.clear_waypoints()
 
+if (MarthaCom.mode == 'AUTO' or MarthaCom.mode == 'GUIDED') and not killswitch:
+    relay_on(bus1, DEVICE_ADDRESS1)
+    relay_off(bus1, DEVICE_ADDRESS2)
+    relay_off(bus0, DEVICE_ADDRESS3)
+    relay_on(bus0, DEVICE_ADDRESS4)
+elif MarthaCom.mode == 'MANUAL' and not killswitch:
+    relay_on(bus1, DEVICE_ADDRESS1)
+    relay_off(bus1, DEVICE_ADDRESS2)
+    relay_on(bus0, DEVICE_ADDRESS3)
+    relay_off(bus0, DEVICE_ADDRESS4)
+elif not killswitch:
+    relay_off(bus1, DEVICE_ADDRESS1)
+    relay_on(bus1, DEVICE_ADDRESS2)
+    relay_off(bus0, DEVICE_ADDRESS3)
+    relay_off(bus0, DEVICE_ADDRESS4)
+else:
+    relay_on(bus1, DEVICE_ADDRESS1)
+    relay_off(bus1, DEVICE_ADDRESS2)
+    relay_off(bus0, DEVICE_ADDRESS3)
+    relay_on(bus0, DEVICE_ADDRESS4)
+
 if not MarthaCom.is_armed:
     MarthaCom.arm(True)
 
-firstLat = input("Latitude: ")
-firstLon = input("Longitude: ")
+firstLat = float(input("Latitude: "))
+firstLon = float(input("Longitude: "))
 MarthaCom.change_mode("GUIDED")
 MarthaCom.send_guided_wp(firstLat, firstLon)
 
 while not MarthaCom.waypoint_reached() or not rospy.is_shutdown():
-    rospy.loginfo("On my way to startpoint...")
+    try:
+        killswitch = GPIO.input(emergency_stop)
+        if (MarthaCom.ini_mode == 'AUTO' or MarthaCom.ini_mode == 'GUIDED') and killswitch:
+            relay_on(bus1, DEVICE_ADDRESS1)
+            relay_off(bus1, DEVICE_ADDRESS2)
+            relay_off(bus0, DEVICE_ADDRESS3)
+            relay_on(bus0, DEVICE_ADDRESS4)
+        elif MarthaCom.ini_mode == 'MANUAL' and killswitch:
+            relay_on(bus1, DEVICE_ADDRESS1)
+            relay_off(bus1, DEVICE_ADDRESS2)
+            relay_on(bus0, DEVICE_ADDRESS3)
+            relay_off(bus0, DEVICE_ADDRESS4)
+        elif not killswitch:
+            relay_off(bus1, DEVICE_ADDRESS1)
+            relay_on(bus1, DEVICE_ADDRESS2)
+            relay_off(bus0, DEVICE_ADDRESS3)
+            relay_off(bus0, DEVICE_ADDRESS4)
+            MarthaCom.change_mode("MANUAL")
+            break
+        else:
+            relay_off(bus1, DEVICE_ADDRESS1)
+            relay_off(bus1, DEVICE_ADDRESS2)
+            relay_off(bus0, DEVICE_ADDRESS3)
+            relay_off(bus0, DEVICE_ADDRESS4)
+        rospy.loginfo("On my way to startpoint...")
+    except rospy.ROSInterruptException:
+        break
+
+rospy.loginfo("Start point reached, starting mission!")
 
 while not rospy.is_shutdown():
     startTime = datetime.now()
-    try:          
+    try:
+        killswitch = GPIO.input(emergency_stop)
+        if (MarthaCom.ini_mode == 'AUTO' or MarthaCom.ini_mode == 'GUIDED') and killswitch:
+            relay_on(bus1, DEVICE_ADDRESS1)
+            relay_off(bus1, DEVICE_ADDRESS2)
+            relay_off(bus0, DEVICE_ADDRESS3)
+            relay_on(bus0, DEVICE_ADDRESS4)
+        elif MarthaCom.ini_mode == 'MANUAL' and killswitch:
+            relay_on(bus1, DEVICE_ADDRESS1)
+            relay_off(bus1, DEVICE_ADDRESS2)
+            relay_on(bus0, DEVICE_ADDRESS3)
+            relay_off(bus0, DEVICE_ADDRESS4)
+        elif not killswitch:
+            relay_off(bus1, DEVICE_ADDRESS1)
+            relay_on(bus1, DEVICE_ADDRESS2)
+            relay_off(bus0, DEVICE_ADDRESS3)
+            relay_off(bus0, DEVICE_ADDRESS4)
+            MarthaCom.change_mode("MANUAL")
+            break
+        else:
+            relay_off(bus1, DEVICE_ADDRESS1)
+            relay_off(bus1, DEVICE_ADDRESS2)
+            relay_off(bus0, DEVICE_ADDRESS3)
+            relay_off(bus0, DEVICE_ADDRESS4)        
         MarthaVision.docking_mission()
         scriptTime = datetime.now() - startTime
         rospy.loginfo("Script time: " + str(scriptTime))

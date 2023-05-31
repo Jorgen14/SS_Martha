@@ -422,22 +422,22 @@ class droneVision:
 
     def check_gate_orientation(self): # Assumes check_buoy_gate function is already called
         try:
-            if self.closest_color == "green_buoy":
+            if self.closest_color == "red_buoy":
                 if (self.closest_bearing - self.second_closest_bearing) < 0: 
-                    rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
+                    rospy.logdebug("Red buoy is on the left, and green buoy is on the right.")
                     return True
                 else:
-                    rospy.logdebug("Red buoy is on the left, and green buoy is on the right.") 
+                    rospy.logdebug("Green buoy is on the left, and red buoy is on the right.") 
                     return False
             else:
                 if (self.closest_bearing - self.second_closest_bearing) > 0:                     
-                   rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
+                   rospy.logdebug("Red buoy is on the left, and green buoy is on the right.")
                    return True                                                                  
                 else:                                                                            
-                   rospy.logdebug("Red buoy is on the left, and green buoy is on the right.")
+                   rospy.logdebug("Green buoy is on the left, and red buoy is on the right.")
                    return False    
         except TypeError:
-            rospy.logdebug("Can't check gate orientation!")
+            rospy.logerr("Can't check gate orientation!")
 
     def check_rel_dist(self):
         self.rel_dist_err = False
