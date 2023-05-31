@@ -1,9 +1,12 @@
+"""
 import socket
 import time
+import collections.abc
 from dronekit import connect, VehicleMode
 
 # Connect to the vehicle
-vehicle = connect('udp:127.0.0.1:14550', wait_ready=True)
+#vehicle = connect('udp:127.0.0.1:57600', wait_ready=True)
+vehicle = connect('com3', baud=57600, wait_ready=True)
 
 # Create a TCP/IP socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -43,4 +46,49 @@ try:
 finally:
     print('closing socket')
     sock.close()
+    vehicle.close()
+"""
+"""
+# Import the required library
+from dronekit import connect, VehicleMode
+
+# Connection string
+connection_string = "COM3"  # replace with your connection string
+baud_rate = 57600  # replace with your baud rate
+
+# Connect to the Vehicle.
+print("Connecting to vehicle on: %s" % connection_string)
+vehicle = connect(connection_string, baud=baud_rate, wait_ready=True)
+
+# Get some vehicle attributes (state)
+print("Get some vehicle attribute values:")
+print(" GPS: %s" % vehicle.gps_0)
+
+vehicle.close()
+"""
+
+from dronekit import connect, VehicleMode
+import time
+
+# Setup the connection
+connection_string = "COM3"
+baud_rate = 57600
+
+# Connect to the Vehicle.
+print(f"Connecting to vehicle on: {connection_string}")
+vehicle = connect(connection_string, baud=baud_rate, wait_ready=True)
+
+# Function to extract GPS data
+def get_GPS(vehicle):
+    return vehicle.location.global_frame
+
+# Main loop to print GPS data
+try:
+    while True:
+        gps = get_GPS(vehicle)
+        print(f"GPS: Lat={gps.lat}, Lon={gps.lon}, Alt={gps.alt}")
+        time.sleep(1)
+
+except KeyboardInterrupt:
+    print("Stopped by User")
     vehicle.close()
