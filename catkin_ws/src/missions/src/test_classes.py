@@ -28,10 +28,10 @@ MarthaCom.clear_waypoints()
 if not MarthaCom.is_armed:
     MarthaCom.arm(True)
 
-firstLat = float(input("Latitude: "))
-firstLon = float(input("Longitude: "))
-MarthaCom.change_mode("GUIDED")
-MarthaCom.send_guided_wp(firstLat, firstLon)
+# firstLat = float(input("Latitude: "))
+# firstLon = float(input("Longitude: "))
+# MarthaCom.change_mode("GUIDED")
+# MarthaCom.send_guided_wp(firstLat, firstLon)
 
 #MarthaCom.change_mode("GUIDED")
 
