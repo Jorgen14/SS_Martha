@@ -88,7 +88,7 @@ class droneVision:
         self.search_iter = 0
 
         self.communication = apCommunication()
-        self.model = YOLO('/home/navo/GitHub/SS_Martha/YOLOv8/buoy_s.pt') 
+        self.model = YOLO('/home/navo/GitHub/SS_Martha/YOLOv8/buoy_m2.pt') 
         
         rospy.loginfo("Warming up model...")
         self._image_and_depth_map()
